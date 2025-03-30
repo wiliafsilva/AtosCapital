@@ -6,7 +6,7 @@ dados_empresa = (
     'SERVER=aquidaba.infonet.com.br;'
     'DATABASE=dbproinfo;'
     'UID=leituraVendas;'
-    'PWD=KRphDP65BM;'
+    '********;'
     'Connection Timeout=30'
 )
 
