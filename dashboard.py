@@ -1,7 +1,9 @@
+from collections import defaultdict
+from decimal import Decimal
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import plotly.express as px
 import consultaSQL
 
 st.set_page_config(
@@ -17,7 +19,14 @@ with st.sidebar:
 st.sidebar.header("Filtros")
 filiais= consultaSQL.obter_nmfilial()
 filial_selecionada = st.sidebar.selectbox("Selecione a Filial", filiais)
+
+meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+         "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+
+mes_referencia = st.sidebar.multiselect("selcione o mês de referencia", meses)
+
 #sidebar
+
 
 #inicio cabeçalho
 left_co, cent_co,last_co = st.columns(3)
@@ -46,6 +55,8 @@ percentual_crescimento_atual = consultaSQL.obter_percentual_de_crescimento_atual
 percentual_crescimento_meta = consultaSQL.obter_percentual_crescimento_meta(filial_selecionada)
 
 
+
+@st.cache_data #as informações da função vai ficar em cache
 # Criar gráfico de comparação Meta x Previsão x Vendas
 def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas):
     # Converte os valores para float (caso venham como Decimal)
@@ -80,13 +91,7 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
     return fig
 
 
-#criando o dataframe para a tabela
-df = pd.DataFrame(
-   [
-    {"Filial": f"{filial_selecionada}", "Vendas 2024": f"{total_vendas:,.2f}", "Acum. 2024": f"{acumulo_vendas_ano_anterior:,.2f}", "Vendas do dia": f"{vendas_dia_anterior:,.2f}" }
-   ]
-)
-
+@st.cache_data #as informações da função vai ficar em cache
 #grafico de crescimento
 def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta):
     percentual_crescimento_atual = float(percentual_crescimento_atual)
@@ -118,9 +123,55 @@ def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_
     return fig
 
 
+def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
+        vendas = consultaSQL.obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada)
+
+        if vendas:
+            # Extrai os valores de forma clara para evitar erro de tipos
+            valores = [float(v[0]) if isinstance(v[0], Decimal) else v[0] for v in vendas]
+            datas = [v[1] for v in vendas]
+
+            # Cria o DataFrame corretamente com duas colunas
+            df_vendas = pd.DataFrame({
+                "Data": pd.to_datetime(datas),
+                "Valor": valores
+            })
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df_vendas["Data"],
+                y=df_vendas["Valor"],
+                mode='lines+markers',
+                name='Vendas',
+                line=dict(color='blue')
+            ))
+            
+            fig.update_layout(
+                title= f"📈 Vendas diárias - {filial_selecionada}",
+                xaxis_title="Data",
+                yaxis_title="Vendas (R$)",
+                template="plotly_white",
+                
+            )
+
+            #st.plotly_chart(fig, use_container_width=True)
+
+            # Tabela abaixo (opcional)
+            with st.expander("📋 Ver tabela de vendas do mês"):
+                st.dataframe(df_vendas, use_container_width=True)
+
+            return fig
+        else:
+            st.warning("Nenhuma venda encontrada para os filtros selecionados.")
 
 
 
+#criando o dataframe para a tabela
+df = pd.DataFrame(
+   [
+    {"Filial": f"{filial_selecionada}", "Vendas 2024": f"{total_vendas:,.2f}", "Acum. 2024": f"{acumulo_vendas_ano_anterior:,.2f}", "Vendas do dia": f"{vendas_dia_anterior:,.2f}" }
+   ]
+)
 
 #Exibição:
 
@@ -138,10 +189,8 @@ st.dataframe(df, use_container_width=True, hide_index= True)
 
 st.divider()
 
-
-
-
-
+grafico3 = grafico_linhas_por_filial(mes_referencia,filial_selecionada)
+st.write(grafico3)
 
 
 

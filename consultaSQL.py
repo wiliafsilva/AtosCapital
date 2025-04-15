@@ -1,4 +1,7 @@
 #Conxão com o banco
+import calendar
+from datetime import datetime
+import pandas as pd
 import pyodbc
 
 dados_empresa = (
@@ -6,7 +9,7 @@ dados_empresa = (
     'SERVER=aquidaba.infonet.com.br;'
     'DATABASE=dbproinfo;'
     'UID=leituraVendas;'
-    'PWD=*************;'
+    'PWD=KRphDP65BM;'
     'Connection Timeout=30'
 )
 
@@ -317,5 +320,60 @@ def obter_percentual_crescimento_meta(filial):
     except pyodbc.Error as e:
         print(f"Erro: {e}")
         return None
+    finally:
+        conn.close()
+
+
+def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
+   
+    nomes_para_numeros = {
+    "Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
+    "Maio": "05", "Junho": "06", "Julho": "07", "Agosto": "08",
+    "Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12"
+    }
+   
+    if mes_referencia and filial_selecionada:
+        ano_atual = datetime.now().year
+        resultados_totais = []
+    
+    conn = obter_conexao()
+    if conn is None:
+        return []
+
+    try:
+        cursor = conn.cursor()
+
+        resultados_totais = []
+
+        
+        for mes_nome in mes_referencia:
+            mes_num = int(nomes_para_numeros[mes_nome])
+            ultimo_dia = calendar.monthrange(ano_atual, mes_num)[1]
+
+            data_inicio = f"{ano_atual}-{mes_num:02d}-01"
+            data_fim = f"{ano_atual}-{mes_num:02d}-{ultimo_dia}"
+
+            query = """
+            SELECT vlVenda, dtVenda
+            FROM tbVendasDashboard
+            WHERE dtVenda BETWEEN ? AND ?
+            AND nmFilial = ?
+            ORDER BY dtVenda
+            """
+            cursor.execute(query, (data_inicio, data_fim, filial_selecionada))
+            resultados_totais.extend(cursor.fetchall())
+
+            #print(resultados_totais)
+
+            if resultados_totais is not None:
+                return resultados_totais  
+            else:
+                return 0  
+
+
+    # Fechar conexão
+    except pyodbc.Error as e:
+            print(f"Erro: {e}")
+            return None
     finally:
         conn.close()
