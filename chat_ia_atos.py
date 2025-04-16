@@ -1,12 +1,13 @@
 import spacy
 import numpy
 from sklearn.metrics.pairwise import cosine_similarity
-import pyodbc  # Importe a biblioteca pyodbc aqui
+import pyodbc
+import re
 
 # Carregando o modelo spaCy com embeddings grandes
 nlp = spacy.load("pt_core_news_lg")
 
-# Função para obter a conexão com o banco de dados
+# Função para obter a conexão com o banco de dados (mantenha como estava)
 def obter_conexao():
     dados_empresa = (
         'DRIVER={ODBC driver 17 for SQL Server};'
@@ -21,7 +22,7 @@ def obter_conexao():
         print(f'Erro ao conectar ao banco de dados: {e}')
         return None
 
-# Função para obter os metadados do banco de dados
+# Função para obter os metadados do banco de dados (mantenha como estava)
 def obter_metadados(conexao):
     tabelas = []
     colunas_por_tabela = {}
@@ -43,7 +44,7 @@ def obter_metadados(conexao):
             cursor.close()
     return tabelas, colunas_por_tabela
 
-# Função para obter embedding de uma palavra (agora com tratamento específico para colunas compostas)
+# Função para obter embedding de uma palavra (mantenha como estava)
 def get_embedding(word, colunas_metadata):
     vector = nlp(str(word)).vector
     if numpy.all(vector == 0):
@@ -74,17 +75,18 @@ def get_embedding(word, colunas_metadata):
 # Consulta do usuário
 consulta = str(input('Digite a sua consulta: '))
 doc_consulta = nlp(consulta)
+print("Entidades Detectadas:", [(ent.text, ent.label_) for ent in doc_consulta.ents])
 
-# Obter conexão e metadados
+# Obter conexão e metadados (mantenha como estava)
 conexao = obter_conexao()
 tabelas_metadata, colunas_metadata = obter_metadados(conexao)
 
 if not tabelas_metadata:
     print("Não foram encontradas tabelas no banco de dados.")
 else:
-    tabela_selecionada = tabelas_metadata[0] # Assumindo a primeira tabela como padrão (precisará de lógica mais robusta para seleção de tabela)
+    tabela_selecionada = tabelas_metadata[0] # Assumindo a primeira tabela
 
-    # Encontrar colunas relevantes
+    # Encontrar colunas relevantes (mantenha a lógica atual por enquanto)
     colunas_selecionadas = set()
     limiar_padrao = 0.2
     limiar_vendas = 0.58
@@ -105,26 +107,59 @@ else:
             if coluna_mais_similar_token:
                 colunas_selecionadas.add(coluna_mais_similar_token)
 
-    # Identificar condição (exemplo mais robusto para "valor da filial solicitada na data solicitada")
-    condicao_coluna = None
-    condicao_valor = None
-    for ent in doc_consulta.ents:
-        if ent.label_ == "LOC":  # Assumindo que a filial é identificada como uma localização
-            condicao_coluna = "nmFilial"
-            condicao_valor = ent.text
-        elif ent.label_ == "DATE": # Assumindo que a data é identificada como uma data
-            if condicao_coluna is None:
-                condicao_coluna = "dtVenda"
-                condicao_valor = ent.text # Formatação da data pode ser necessária
+   # Identificar condição (data) - Priorizando "data" e Refinando Formatos
+    condicao_coluna_data = None
+    condicao_valor_data = None
 
-    # Montar o script SQL
-    script_sql = f"SELECT {', '.join(colunas_selecionadas)} FROM {tabela_selecionada}"
-    if condicao_coluna and condicao_valor:
-        script_sql += f" WHERE {condicao_coluna} = '{condicao_valor}'"
+    for i, token in enumerate(doc_consulta):
+        if token.lower_ == "data" and i + 1 < len(doc_consulta):
+            # Tentar pegar o valor da data nos tokens seguintes
+            valor_data_str = " ".join([t.text for t in doc_consulta[i + 1:]])
+        
+            # Verificar por formatos comuns
+            data_match = re.search(r'(\d{4}-\d{2}-\d{2})', valor_data_str)
+            if data_match:
+                condicao_coluna_data = "dtVenda"
+                condicao_valor_data = data_match.group(1)
+                break
+
+            data_match = re.search(r'(\d{1,2} de \w+ de \d{4})', valor_data_str, re.IGNORECASE)
+            if data_match:
+                condicao_coluna_data = "dtVenda"
+                condicao_valor_data = data_match.group(1)
+                # A CONVERSÃO PARA 'YYYY-MM-DD' SERIA IDEAL AQUI
+                break
+
+            data_match = re.search(r'(\d{2}/\d{2}/\d{4})', valor_data_str)
+            if data_match:
+                condicao_coluna_data = "dtVenda"
+                condicao_valor_data = data_match.group(1)
+                # A CONVERSÃO PARA 'YYYY-MM-DD' SERIA IDEAL AQUI
+                break
+
+    # Se nenhuma data for encontrada pela busca por "data", verificar entidades DATE
+    if not condicao_coluna_data:
+        for ent in doc_consulta.ents:
+            if ent.label_ == "DATE":
+                condicao_coluna_data = "dtVenda"
+                condicao_valor_data = str(ent.text)
+                break
+
+    # Verificar se a consulta pede agregação ("mais vendeu")
+    if "mais vendeu" in consulta.lower():
+        script_sql = f"SELECT TOP 1 nmFilial, SUM(vlVenda) AS total_vendas FROM {tabela_selecionada}"
+        if condicao_coluna_data and condicao_valor_data:
+            script_sql += f" WHERE {condicao_coluna_data} = '{condicao_valor_data}'"
+        script_sql += " GROUP BY nmFilial ORDER BY total_vendas DESC"
+    else:
+        # Consulta padrão (sem agregação) - Manter a lógica anterior
+        script_sql = f"SELECT {', '.join(colunas_selecionadas)} FROM {tabela_selecionada}"
+        if condicao_coluna_data and condicao_valor_data:
+            script_sql += f" WHERE {condicao_coluna_data} = '{condicao_valor_data}'"
 
     print("SQL Gerado:", script_sql)
 
-    # Executar a consulta e obter os resultados
+    # Executar a consulta e obter os resultados (mantenha como estava)
     if conexao:
         cursor = conexao.cursor()
         try:
@@ -144,17 +179,12 @@ else:
             cursor.close()
         conexao.close()
 
-    # --- Bloco para depuração (verificar vetores) ---
+    # --- Blocos de depuração (mantenha como estavam) ---
     print("\n--- Vetores para algumas palavras ---")
     print(f"Vetor para 'nmFilial': {get_embedding('nmFilial', colunas_metadata)[:5]}")
     print(f"Vetor para 'vlVenda': {get_embedding('vlVenda', colunas_metadata)[:5]}")
-    print(f"Vetor para 'valor': {get_embedding('valor', colunas_metadata)[:5]}")
-    print(f"Vetor para 'vendas': {get_embedding('vendas', colunas_metadata)[:5]}")
-    print(f"Vetor para 'nome': {get_embedding('nome', colunas_metadata)[:5]}")
-    print(f"Vetor para 'filial': {get_embedding('filial', colunas_metadata)[:5]}")
     print(f"Vetor para 'dtVenda': {get_embedding('dtVenda', colunas_metadata)[:5]}")
 
-    # --- Bloco para depuração (verificar similaridades) ---
     print("\n--- Similaridades entre tokens da consulta e colunas ---")
     for token in doc_consulta:
         if token.pos_ in ["NOUN", "ADJ"]:
