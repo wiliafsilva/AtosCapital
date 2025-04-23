@@ -1,6 +1,7 @@
 #Conxão com o banco
 import calendar
 from datetime import datetime
+from matplotlib.dates import relativedelta
 import pandas as pd
 import pyodbc
 
@@ -323,19 +324,19 @@ def obter_percentual_crescimento_meta(filial):
     finally:
         conn.close()
 
-
 def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
-   
     nomes_para_numeros = {
-    "Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
-    "Maio": "05", "Junho": "06", "Julho": "07", "Agosto": "08",
-    "Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12"
+        "Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
+        "Maio": "05", "Junho": "06", "Julho": "07", "Agosto": "08",
+        "Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12"
     }
-   
-    if mes_referencia and filial_selecionada:
-        ano_atual = datetime.now().year
-        resultados_totais = []
-    
+
+    if not (mes_referencia and filial_selecionada):
+        return []
+
+    ano_atual = datetime.now().year
+    resultados_totais = []
+
     conn = obter_conexao()
     if conn is None:
         return []
@@ -343,9 +344,6 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
     try:
         cursor = conn.cursor()
 
-        resultados_totais = []
-
-        
         for mes_nome in mes_referencia:
             mes_num = int(nomes_para_numeros[mes_nome])
             ultimo_dia = calendar.monthrange(ano_atual, mes_num)[1]
@@ -354,26 +352,70 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
             data_fim = f"{ano_atual}-{mes_num:02d}-{ultimo_dia}"
 
             query = """
-            SELECT vlVenda, dtVenda
-            FROM tbVendasDashboard
-            WHERE dtVenda BETWEEN ? AND ?
-            AND nmFilial = ?
-            ORDER BY dtVenda
+                SELECT vlVenda, dtVenda, ? as mes_nome
+                FROM tbVendasDashboard
+                WHERE dtVenda BETWEEN ? AND ?
+                AND nmFilial = ?
+                ORDER BY dtVenda
             """
-            cursor.execute(query, (data_inicio, data_fim, filial_selecionada))
+            cursor.execute(query, (mes_nome, data_inicio, data_fim, filial_selecionada))
             resultados_totais.extend(cursor.fetchall())
 
-            #print(resultados_totais)
+        return resultados_totais
 
-            if resultados_totais is not None:
-                return resultados_totais  
-            else:
-                return 0  
-
-
-    # Fechar conexão
     except pyodbc.Error as e:
-            print(f"Erro: {e}")
-            return None
+        print(f"Erro: {e}")
+        return []
     finally:
         conn.close()
+    
+
+def obter_vendas_anual_e_filial(filial_selecionada):
+    """Retorna um dicionário com o total de vendas dos últimos 12 meses para uma filial específica."""
+    conn = obter_conexao()
+    if conn is None:
+        return []
+
+    try:
+        cursor = conn.cursor()
+
+        # Gera os 13 últimos meses a partir do mês atual
+        meses = []
+        hoje = datetime.today().replace(day=1)
+        for i in range(13):
+            mes_ref = hoje - relativedelta(months=i)
+            ano = mes_ref.year
+            mes = mes_ref.month
+            meses.append((ano, mes))
+
+        # Cria um dicionário para armazenar os resultados
+        vendas_por_mes = {}
+
+        for ano, mes in meses:
+            # Pega o último dia do mês de forma precisa
+            ultimo_dia = calendar.monthrange(ano, mes)[1]
+            data_inicio = f"{ano}-{mes:02d}-01"
+            data_fim = f"{ano}-{mes:02d}-{ultimo_dia}"
+
+            consulta = '''
+                SELECT SUM(vlVenda) as total
+                FROM tbVendasDashboard
+                WHERE dtVenda BETWEEN ? AND ?
+                  AND nmFilial = ?
+            '''
+            cursor.execute(consulta, (data_inicio, data_fim, filial_selecionada))
+            resultado = cursor.fetchone()
+            chave = f"{mes:02d}/{ano}"
+            vendas_por_mes[chave] = resultado.total if resultado and resultado.total else 0
+
+        # Ordena por data decrescente (mais recente primeiro)
+        vendas_ordenadas = dict(sorted(vendas_por_mes.items(), key=lambda x: datetime.strptime(x[0], "%m/%Y"), reverse=True))
+        
+        return vendas_ordenadas
+    
+    except pyodbc.Error as e:
+        print(f"Erro ao consultar o banco de dados: {e}")
+        return {}
+    finally:
+        conn.close()
+    
