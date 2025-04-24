@@ -255,7 +255,7 @@ def obter_percentual_de_crescimento_atual(filial):
         SELECT 
             CASE 
                 WHEN vendas_ano_anterior > 0 THEN 
-                    ROUND(((vendas_atual - vendas_ano_anterior) / vendas_ano_anterior) * 100, 2)  -- Limita a 2 casas decimais
+                    ROUND(((vendas_atual / vendas_ano_anterior) - 1) * 100, 2)  -- Limita a 2 casas decimais
                 ELSE 0  -- Evitar divisão por zero
             END AS percentual_diferenca
         FROM vendas_mes_atual, vendas_mes_ano_anterior;
@@ -304,7 +304,7 @@ def obter_percentual_crescimento_meta(filial):
         SELECT 
             CAST(
                 ROUND(
-                    ((VA.total_ano_atual - VAA.meta_ano_anterior) / NULLIF(VA.total_ano_atual, 0)) * 100, 
+                    ((VA.total_ano_atual / VAA.meta_ano_anterior) - 1) * 100, 
                     2
                 ) AS DECIMAL(10,2)
             ) AS percentual_diferenca
