@@ -101,7 +101,7 @@ def obter_previsao_vendas(filial):
         consulta = '''
         SELECT 
             CAST(
-                (SUM(vlVenda) / DAY(GETDATE())) * 
+                (SUM(vlVenda) / DAY(GETDATE() - 1)) * 
                 DAY(DATEADD(DAY, -DAY(GETDATE()), DATEADD(MONTH, 1, GETDATE())))
             AS DECIMAL(10,2)) AS previsao_vendas
         FROM tbVendasDashboard
