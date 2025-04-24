@@ -8,7 +8,7 @@ import plotly.express as px
 import consultaSQL
 
 st.set_page_config(
-    page_title='Relatório',
+    page_title='Dashboard',
     page_icon=':a:',
     layout='wide'
 )
