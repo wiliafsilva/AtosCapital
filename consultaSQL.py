@@ -378,8 +378,7 @@ def obter_vendas_anual_e_filial(filial_selecionada):
 
     try:
         cursor = conn.cursor()
-
-        # Gera os 13 últimos meses a partir do mês atual
+        
         meses = []
         hoje = datetime.today().replace(day=1)
         for i in range(13):

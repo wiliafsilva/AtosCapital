@@ -5,7 +5,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import locale as lc
 import consultaSQL
+
+lc.setlocale(lc.LC_ALL, 'pt_BR')
 
 st.set_page_config(
     page_title='Dashboard',
@@ -69,7 +72,6 @@ vendas_mensais = consultaSQL.obter_vendas_anual_e_filial(filial_selecionada)
 
 
 @st.cache_data #as informações da função vai ficar em cache
-# Criar gráfico de comparação Meta x Previsão x Vendas
 def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas):
     # Converte os valores para float (caso venham como Decimal)
     meta_mes = float(meta_mes)
@@ -87,7 +89,7 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
         x=categorias,
         y=valores,
         marker_color=cores,
-        text=[f"R$ {v:,.2f}" for v in valores],
+        text=[f"R$ {lc.currency(v, grouping=True, symbol=False)}" for v in valores],
         textposition='outside'
     ))
 
@@ -98,13 +100,18 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
         font=dict(color="white", size=14),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
+        height=550, 
+        width=500,
+        yaxis=dict(
+            tickprefix="R$ ",
+            separatethousands=True, 
+            tickformat=",." 
+        )
     )
 
     return fig
 
-
 @st.cache_data #as informações da função vai ficar em cache
-#grafico de crescimento
 def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta):
     percentual_crescimento_atual = float(percentual_crescimento_atual)
     percentual_crescimento_meta = float(percentual_crescimento_meta)
@@ -130,6 +137,8 @@ def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_
         font=dict(color="white", size=14),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
+        height=500, 
+        width=500
     )
 
     return fig
@@ -158,6 +167,8 @@ def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
 
     fig = go.Figure()
 
+    df_vendas["Valor_formatado"] = df_vendas["Valor"].apply(lambda x: lc.currency(x, grouping=True))
+
     # Adiciona uma linha para cada mês com cor diferente
     for mes in df_vendas["Mês"].unique():
         df_mes = df_vendas[df_vendas["Mês"] == mes]
@@ -166,17 +177,23 @@ def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
             x=df_mes["Dia"], 
             y=df_mes["Valor"],
             mode='lines+markers',
-            name=mes
+            name=mes,
+            hovertemplate='Dia %{x}<br>Valor: %{customdata}<extra></extra>',
+            customdata=df_mes["Valor_formatado"]
         ))
 
     fig.update_layout(
         title=f"📈 Vendas comparadas por dia do mês - {filial_selecionada}",
         xaxis_title="Dia do Mês",
         yaxis_title="Vendas (R$)",
-        template="plotly_white"
+        template="plotly_white",
+        yaxis=dict(
+            tickprefix="R$ ",
+            separatethousands=True, 
+            tickformat=",." 
+        )
     )
 
-    #st.plotly_chart(fig, use_container_width=True)
     return fig
 
 @st.cache_data #as informações da função vai ficar em cache
@@ -188,27 +205,36 @@ def acompanhamento_anual(filial_selecionada):
         valores = [float(v[0]) if isinstance(v[0], Decimal) else v[0] for v in vendas]
     
         df_vendas = pd.DataFrame({
-                "AnoMes": pd.to_datetime(datas, format="%Y-%m"),
-                "Valor": valores
-            })
+            "AnoMes": pd.to_datetime(datas, format="%Y-%m"),
+            "Valor": valores
+        })
         
            # Ordena os meses
         df_vendas = df_vendas.sort_values("AnoMes")
 
         fig = go.Figure()
 
+        df_vendas["Valor_formatado"] = df_vendas["Valor"].apply(lambda y: lc.currency(y, grouping=True))
+
         fig.add_trace(go.Scatter(
-            x=df_vendas["AnoMes"].dt.strftime('%b/%Y'),
+            x=df_vendas["AnoMes"].dt.strftime('%m/%Y'),
             y=df_vendas["Valor"],
             mode='lines+markers',
-            name="Vendas"
+            name="Vendas",
+            hovertemplate='Mês %{x}<br>Valor: %{customdata}<extra></extra>',
+            customdata=df_vendas["Valor_formatado"]
         ))
 
         fig.update_layout(
             title=f"📊 Vendas nos últimos 12 meses - {filial_selecionada}",
             xaxis_title="Mês/Ano",
             yaxis_title="Vendas (R$)",
-            template="plotly_white"
+            template="plotly_white",
+            yaxis=dict(
+                tickprefix="R$ ",
+                separatethousands=True,  # coloca separador de milhar
+                tickformat=",."  # formato numérico com separador de milhar
+            )
         )
 
         return fig
@@ -233,16 +259,6 @@ def grafico_de_evolucao_vendas(vendas_mensais):
     )
     return fig
 
-# Exibição
-
-
-#criando o dataframe para a tabela
-df = pd.DataFrame(
-   [
-    {"Filial": f"{filial_selecionada}", "Vendas 2024": f"{total_vendas:,.2f}", "Acum. 2024": f"{acumulo_vendas_ano_anterior:,.2f}", "Vendas do dia": f"{vendas_dia_anterior:,.2f}" }
-   ]
-)
-
 #Mapa das filiais
 coordenadas_filiais = {
     'FILIAL BELÉM': {'latitude': -1.455, 'longitude': -48.489},
@@ -263,13 +279,9 @@ coordenadas_filiais = {
     'FILIAL SÃO LUÍS': {'latitude': -2.5307, 'longitude': -44.3068},
     'FILIAL SÃO PAULO': {'latitude': -23.5505, 'longitude': -46.6333},
 }
-
-# Suponha que isso veio do banco
 dados_vendas = pd.DataFrame({
     'filial': ['FILIAL BELÉM', 'FILIAL BELO HORIZONTE', 'FILIAL BRASÍLIA', 'FILIAL CAMPINAS', 'FILIAL CURITIBA', 'FILIAL DUQUE DE CAXIAS', 'FILIAL FORTALEZA', 'FILIAL GOIÂNIA', 'FILIAL GUARULHOS', 'FILIAL MACEIÓ', 'FILIAL MANAUS', 'FILIAL RECIFE', 'FILIAL RIO DE JANEIRO', 'FILIAL SALVADOR', 'FILIAL SÃO GONÇALO', 'FILIAL SÃO LUÍS', 'FILIAL SÃO PAULO']
 })
-
-
 # Adiciona latitude e longitude ao DataFrame
 dados_vendas['latitude'] = dados_vendas['filial'].map(lambda x: coordenadas_filiais[x]['latitude'])
 dados_vendas['longitude'] = dados_vendas['filial'].map(lambda x: coordenadas_filiais[x]['longitude'])
@@ -281,17 +293,16 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
    st.write(f"""#### Vendas 2024: \n 
-            R$ {total_vendas:,.2f}
+            R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
             """)
 with col2:
    st.write(f"""#### Acumulado 2024: \n
-            R$ {acumulo_vendas_ano_anterior:,.2f}
+            R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
             """)
 with col3:
    st.write(f"""#### Vendas do dia: \n 
-            R$ {vendas_dia_anterior:,.2f}""") 
+            R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)}""") 
    
-
 exibindo_grafico_de_barras = grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas)
 st.plotly_chart(exibindo_grafico_de_barras, use_container_width=True)
 
@@ -300,19 +311,11 @@ st.divider()
 exibindo_grafico_de_crescimento = grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta)
 st.sidebar.plotly_chart(exibindo_grafico_de_crescimento)
 
-#exibindo a tabela
-st.dataframe(df, use_container_width=True, hide_index= True)
-
-st.divider()
-
-#grafico de linhas vendas por mes
 exibindo_grafico_de_linhas_vendas_por_mes = grafico_linhas_por_filial(mes_referencia,filial_selecionada)
 st.write(exibindo_grafico_de_linhas_vendas_por_mes)
 
-#Grafico de linhas anual
 exibindo_grafico_acompanhamanto_anual = grafico_de_evolucao_vendas(vendas_mensais)
 st.write(exibindo_grafico_acompanhamanto_anual)
-
 
 st.subheader("📍 Mapa das filiais")
 st.map(dados_vendas[['latitude', 'longitude']]) 
