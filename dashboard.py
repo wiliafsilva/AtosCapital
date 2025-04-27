@@ -38,7 +38,10 @@ filial_selecionada = st.sidebar.selectbox("Selecione a Filial", filiais)
 meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-mes_referencia = st.sidebar.multiselect("Selecione o mês de referencia", meses)
+mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses)
+
+# Transforma o mês selecionado em lista
+mes_referencia = [mes_referencia]
 
 #sidebar
 
@@ -144,7 +147,7 @@ def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_
     return fig
 
 @st.cache_data #as informações da função vai ficar em cache
-def grafico_linhas_por_filial(mes_referencia, filial_selecionada): 
+def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
     vendas = consultaSQL.obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada)
 
     if not vendas:
@@ -155,46 +158,49 @@ def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
     valores = [float(v[0]) if isinstance(v[0], Decimal) else v[0] for v in vendas]
     datas = [v[1] for v in vendas]
     meses = [v[2] for v in vendas]
+    anos = [v[3] for v in vendas]
 
     df_vendas = pd.DataFrame({
         "Data": pd.to_datetime(datas),
         "Valor": valores,
-        "Mês": [str(m) for m in meses]
+        "Mês": [str(m) for m in meses],
+        "Ano": [str(a) for a in anos]
     })
 
-    df_vendas["Mês"] = df_vendas["Mês"].astype(str)
     df_vendas["Dia"] = df_vendas["Data"].dt.day 
+    df_vendas["Valor_formatado"] = df_vendas["Valor"].apply(lambda x: lc.currency(x, grouping=True))
 
     fig = go.Figure()
 
-    df_vendas["Valor_formatado"] = df_vendas["Valor"].apply(lambda x: lc.currency(x, grouping=True))
+    # Criar um agrupador mês/ano para diferenciar as linhas
+    df_vendas["MesAno"] = df_vendas["Mês"] + "/" + df_vendas["Ano"]
 
-    # Adiciona uma linha para cada mês com cor diferente
-    for mes in df_vendas["Mês"].unique():
-        df_mes = df_vendas[df_vendas["Mês"] == mes]
+    for mesano in df_vendas["MesAno"].unique():
+        df_mesano = df_vendas[df_vendas["MesAno"] == mesano]
 
         fig.add_trace(go.Scatter(
-            x=df_mes["Dia"], 
-            y=df_mes["Valor"],
+            x=df_mesano["Dia"], 
+            y=df_mesano["Valor"],
             mode='lines+markers',
-            name=mes,
+            name=mesano,
             hovertemplate='Dia %{x}<br>Valor: %{customdata}<extra></extra>',
-            customdata=df_mes["Valor_formatado"]
+            customdata=df_mesano["Valor_formatado"]
         ))
 
     fig.update_layout(
-        title=f"📈 Vendas comparadas por dia do mês - {filial_selecionada}",
+        title=f"📈 Vendas comparadas {mes_referencia[0]} - {filial_selecionada}",
         xaxis_title="Dia do Mês",
         yaxis_title="Vendas (R$)",
         template="plotly_white",
         yaxis=dict(
             tickprefix="R$ ",
             separatethousands=True, 
-            tickformat=",." 
+            tickformat=",."
         )
     )
 
     return fig
+
 
 @st.cache_data #as informações da função vai ficar em cache
 def acompanhamento_anual(filial_selecionada):

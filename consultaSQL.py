@@ -324,6 +324,7 @@ def obter_percentual_crescimento_meta(filial):
     finally:
         conn.close()
 
+
 def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
     nomes_para_numeros = {
         "Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
@@ -335,6 +336,7 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
         return []
 
     ano_atual = datetime.now().year
+    ano_anterior = ano_atual - 1
     resultados_totais = []
 
     conn = obter_conexao()
@@ -348,17 +350,25 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
             mes_num = int(nomes_para_numeros[mes_nome])
             ultimo_dia = calendar.monthrange(ano_atual, mes_num)[1]
 
-            data_inicio = f"{ano_atual}-{mes_num:02d}-01"
-            data_fim = f"{ano_atual}-{mes_num:02d}-{ultimo_dia}"
+            # Busca para o ano atual
+            data_inicio_atual = f"{ano_atual}-{mes_num:02d}-01"
+            data_fim_atual = f"{ano_atual}-{mes_num:02d}-{ultimo_dia}"
 
             query = """
-                SELECT vlVenda, dtVenda, ? as mes_nome
+                SELECT vlVenda, dtVenda, ? as mes_nome, ? as ano
                 FROM tbVendasDashboard
                 WHERE dtVenda BETWEEN ? AND ?
                 AND nmFilial = ?
                 ORDER BY dtVenda
             """
-            cursor.execute(query, (mes_nome, data_inicio, data_fim, filial_selecionada))
+            cursor.execute(query, (mes_nome, ano_atual, data_inicio_atual, data_fim_atual, filial_selecionada))
+            resultados_totais.extend(cursor.fetchall())
+
+            # Busca para o ano anterior
+            data_inicio_anterior = f"{ano_anterior}-{mes_num:02d}-01"
+            data_fim_anterior = f"{ano_anterior}-{mes_num:02d}-{calendar.monthrange(ano_anterior, mes_num)[1]}"
+
+            cursor.execute(query, (mes_nome, ano_anterior, data_inicio_anterior, data_fim_anterior, filial_selecionada))
             resultados_totais.extend(cursor.fetchall())
 
         return resultados_totais
@@ -368,7 +378,6 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
         return []
     finally:
         conn.close()
-    
 
 def obter_vendas_anual_e_filial(filial_selecionada):
     """Retorna um dicionário com o total de vendas dos últimos 12 meses para uma filial específica."""
