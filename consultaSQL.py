@@ -218,7 +218,7 @@ def obter_ultima_venda_com_valor(filial):
         resultado = cursor.fetchone()
         
         if resultado and resultado.vlVenda is not None:
-            return resultado.vlVenda  # Retorna o valor da última venda com valor
+            return resultado.vlVenda, resultado.dtVenda  # Retorna o valor da última venda com valor
         else:
             return 0  # Retorna 0 se não houver vendas com valor para o mês atual ou anteriores
     except pyodbc.Error as e:
