@@ -65,7 +65,7 @@ acumulo_meta_ano_anterior = consultaSQL.obter_acumulo_meta_ano_anterior(filial_s
 
 acumulo_de_vendas = consultaSQL.obter_acumulo_de_vendas(filial_selecionada)
 
-vendas_dia_anterior = consultaSQL.obter_ultima_venda_com_valor(filial_selecionada)
+vendas_dia_anterior, data_venda_dia = consultaSQL.obter_ultima_venda_com_valor(filial_selecionada)
 
 percentual_crescimento_atual = consultaSQL.obter_percentual_de_crescimento_atual(filial_selecionada)
 
@@ -306,8 +306,9 @@ with col2:
             R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
             """)
 with col3:
-   st.write(f"""#### Vendas do dia: \n 
-            R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)}""") 
+   st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
+            R$ {vendas_dia_anterior:,.2f}""")
+
    
 exibindo_grafico_de_barras = grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas)
 st.plotly_chart(exibindo_grafico_de_barras, use_container_width=True)
