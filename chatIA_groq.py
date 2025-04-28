@@ -1,8 +1,12 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
 import groq
 import pyodbc
 import re
 
 # --- Configurações ---
+app = FastAPI()
+
 GROQ_API_KEY = "SUA_CHAVE_API_GROQ"
 SQL_SERVER_CONFIG = {
     'server': 'seu_servidor',
@@ -132,5 +136,49 @@ def main():
         conexao_sql.close()
         print("Conexão com o SQL Server encerrada.")
 
+class Mensagem(BaseModel):
+    texto: str
+    phone: str
+
+@app.post("/responder")
+def responder(mensagem: Mensagem):
+    pergunta_usuario = mensagem.texto
+    telefone_usuario = mensagem.phone
+
+    conexao_sql = conectar_sql_server(SQL_SERVER_CONFIG)
+    if not conexao_sql:
+        return {"resposta": "Erro ao conectar no banco de dados.", "phone": telefone_usuario}
+
+    prompt = f"""
+    Você tem acesso a um banco de dados SQL Server com os seguintes dados:
+        Tabela: tbVendasDashboard
+        Colunas:
+        - idVendas (PK, int, não nulo)
+        - nrCNPJ (char(14), não nulo)
+        - nmFilial (varchar(50), não nulo)
+        - dtVenda (date, não nulo)
+        - vlVenda (numeric(13,2), nulo)
+        - txMeta (numeric(4,2), não nulo)
+
+        Tente gerar uma consulta SQL para responder à seguinte pergunta:
+        '{pergunta_usuario}'
+    """
+
+    resposta_groq = obter_resposta_groq(prompt)
+    if resposta_groq:
+        match = re.search(r"```sql\n(.*?)\n```", resposta_groq, re.DOTALL)
+        if match:
+            consulta_sql = match.group(1).strip()
+            resultados_sql = executar_consulta_sql(conexao_sql, consulta_sql)
+            if resultados_sql:
+                primeiro_resultado = resultados_sql[0]
+                return {"resposta": str(primeiro_resultado), "phone": telefone_usuario}
+            else:
+                return {"resposta": "Nenhum resultado encontrado para a consulta.", "phone": telefone_usuario}
+        else:
+            return {"resposta": resposta_groq, "phone": telefone_usuario}
+    else:
+        return {"resposta": "Erro ao obter resposta da IA.", "phone": telefone_usuario}
+    
 if __name__ == "__main__":
     main()
