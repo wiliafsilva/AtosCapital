@@ -307,7 +307,7 @@ with col2:
             """)
 with col3:
    st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
-            R$ {vendas_dia_anterior:,.2f}""")
+            R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
 
    
 exibindo_grafico_de_barras = grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas)
