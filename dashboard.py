@@ -59,13 +59,20 @@ percentual_crescimento_atual = consultaSQL.obter_percentual_de_crescimento_atual
 percentual_crescimento_meta = consultaSQL.obter_percentual_crescimento_meta(filial_selecionada)
 vendas_mensais = consultaSQL.obter_vendas_anual_e_filial(filial_selecionada)
 
-@st.cache_data #as informações da função vai ficar em cache
+@st.cache_data
 def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas):
-    # Converte os valores para float (caso venham como Decimal)
-    meta_mes = float(meta_mes)
-    previsao = float(previsao)
-    acumulo_meta_ano_anterior = float(acumulo_meta_ano_anterior)
-    acumulo_de_vendas = float(acumulo_de_vendas)
+    def safe_float(value):
+        if value is None:
+            return 0.0
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
+    meta_mes = safe_float(meta_mes)
+    previsao = safe_float(previsao)
+    acumulo_meta_ano_anterior = safe_float(acumulo_meta_ano_anterior)
+    acumulo_de_vendas = safe_float(acumulo_de_vendas)
 
     categorias = ["Meta do mês", "Previsão", "Acumulado meta", "Acumulado Vendas"]
     valores = [meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas]
@@ -82,27 +89,34 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
     ))
 
     fig.update_layout(
-        title= f"📊 Metas e previsões da {filial_selecionada}",
+        title=f"📊 Metas e previsões da {filial_selecionada}",
         xaxis_title="",
         yaxis_title="Valor (R$)",
         font=dict(color="white", size=14),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        height=550, 
+        height=550,
         width=500,
         yaxis=dict(
             tickprefix="R$ ",
-            separatethousands=True, 
-            tickformat=",." 
+            separatethousands=True,
+            tickformat=",."
         )
     )
     return fig
 
 @st.cache_data 
 def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta):
-    percentual_crescimento_atual = float(percentual_crescimento_atual)
-    percentual_crescimento_meta = float(percentual_crescimento_meta)
+    try:
+        percentual_crescimento_atual = float(percentual_crescimento_atual)
+    except (ValueError, TypeError):
+        percentual_crescimento_atual = 0.0
 
+    try:
+        percentual_crescimento_meta = float(percentual_crescimento_meta)
+    except (ValueError, TypeError):
+        percentual_crescimento_meta = 0.0
+        
     fig = go.Figure()
 
     categorias = ["Cresc. 2025", "Cresc. meta"]
@@ -275,5 +289,37 @@ st.write(exibindo_grafico_de_linhas_vendas_por_mes)
 exibindo_grafico_acompanhamanto_anual = grafico_de_evolucao_vendas(vendas_mensais)
 st.write(exibindo_grafico_acompanhamanto_anual)
 
-st.subheader("📍 Mapa das filiais")
-st.map(dados_vendas[['latitude', 'longitude']]) 
+# Simula valores de vendas para cada filial (você pode substituir pelos reais)
+dados_vendas["vendas"] = dados_vendas["filial"].apply(
+    lambda f: max(float(consultaSQL.obter_acumulo_de_vendas(f) or 0), 1)
+)
+
+
+dados_vendas["vendas_formatado"] = dados_vendas["vendas"].apply(
+    lambda v: lc.format_string('%.2f', v, grouping=True).replace('.', 'X').replace(',', '.').replace('X', ',')
+)
+
+# Cores mais intensas conforme o valor da venda
+fig_mapa = px.scatter_mapbox(
+    dados_vendas,
+    lat="latitude",
+    lon="longitude",
+    hover_name="filial",
+    hover_data={"vendas": ":,.2f"},
+    color="vendas",
+    size="vendas",
+    color_continuous_scale="Turbo",
+    size_max=30,
+    zoom=3,
+    height=600,
+)
+
+
+fig_mapa.update_layout(
+    mapbox_style="carto-darkmatter",  # alternativo: "open-street-map", "white-bg"
+    margin={"r":0, "t":0, "l":0, "b":0},
+    coloraxis_colorbar=dict(title="Vendas (R$)", tickprefix="R$ "),
+)
+
+st.subheader("📍 Mapa das filiais com Vendas Acumuladas")
+st.plotly_chart(fig_mapa, use_container_width=True)
