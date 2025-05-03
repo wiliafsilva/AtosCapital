@@ -50,9 +50,13 @@ def obter_vendas_ano_anterior(filial):
         consulta = '''
         SELECT SUM(vlVenda) AS total_vendas_ano_anterior
         FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(GETDATE()) - 1  -- Ano anterior (2024)
-          AND MONTH(dtVenda) = MONTH(GETDATE())    -- Mesmo mês (março)
-          AND nmFilial = ?                        -- Filtro pela filial
+        WHERE YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))
+          AND MONTH(dtVenda) = 
+              CASE 
+                  WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE())) -- Se for o primeiro dia do mês, pega o mês anterior
+                  ELSE MONTH(GETDATE()) -- Caso contrário, pega o mês atual
+              END
+          AND nmFilial = ?
         '''
         cursor.execute(consulta, (filial,))
         resultado = cursor.fetchone()  # Pega o primeiro resultado
@@ -77,8 +81,12 @@ def obter_meta_mes(filial):
         consulta = '''
         SELECT SUM(vlVenda) * 1.05 AS meta_mes
         FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(GETDATE()) - 1
-          AND MONTH(dtVenda) = MONTH(GETDATE())
+        WHERE YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))
+          AND MONTH(dtVenda) = 
+              CASE 
+                  WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE())) -- Se for o primeiro dia do mês, pega o mês anterior
+                  ELSE MONTH(GETDATE()) -- Caso contrário, pega o mês atual
+              END
           AND nmFilial = ?
         '''
         cursor.execute(consulta, (filial,))
@@ -91,7 +99,7 @@ def obter_meta_mes(filial):
         conn.close()
 
 def obter_previsao_vendas(filial):
-    """Calcula a previsão de vendas do mês corrente para uma filial específica."""
+    """Calcula a previsão de vendas do mês atual para uma filial específica."""
     conn = obter_conexao()
     if conn is None:
         return None
@@ -99,20 +107,56 @@ def obter_previsao_vendas(filial):
     try:
         cursor = conn.cursor()
         consulta = '''
-        SELECT 
+        SELECT
+          CAST(
+            (
+              SUM(vlVenda) / 
+              CAST(
+                CASE 
+                  WHEN DAY(GETDATE()) = 1 THEN 
+                    -- Total de dias do mês anterior
+                    DAY(DATEADD(DAY, -DAY(GETDATE()), GETDATE()))
+                  ELSE 
+                    -- Total de dias do mês atual até ontem
+                    DAY(GETDATE()) - 1
+                END 
+              AS FLOAT)
+            ) *
             CAST(
-                (SUM(vlVenda) / DAY(GETDATE() - 1)) * 
-                DAY(DATEADD(DAY, -DAY(GETDATE()), DATEADD(MONTH, 1, GETDATE())))
-            AS DECIMAL(10,2)) AS previsao_vendas
+                CASE 
+                  WHEN DAY(GETDATE()) = 1 THEN 
+                    -- Total de dias do mês anterior
+                    DAY(DATEADD(DAY, -DAY(GETDATE()), GETDATE()))
+                  ELSE 
+                    -- Total de dias do mês atual
+                    DAY(DATEADD(DAY, -1, DATEADD(MONTH, 1, CAST(CAST(YEAR(GETDATE()) AS VARCHAR) + '-' + RIGHT('0' + CAST(MONTH(GETDATE()) AS VARCHAR), 2) + '-01' AS DATE))))
+                END 
+            AS FLOAT)
+          AS DECIMAL(10,2)) AS previsao_vendas
         FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(GETDATE())  
-          AND MONTH(dtVenda) = MONTH(GETDATE())    
-          AND DAY(dtVenda) <= DAY(GETDATE())       
-          AND nmFilial = ?
+        WHERE
+          dtVenda >= 
+            CASE 
+              WHEN DAY(GETDATE()) = 1 THEN 
+                CAST(YEAR(DATEADD(MONTH, -1, GETDATE())) AS VARCHAR) + '-' +
+                RIGHT('0' + CAST(MONTH(DATEADD(MONTH, -1, GETDATE())) AS VARCHAR), 2) + '-01'
+              ELSE
+                CAST(YEAR(GETDATE()) AS VARCHAR) + '-' +
+                RIGHT('0' + CAST(MONTH(GETDATE()) AS VARCHAR), 2) + '-01'
+            END
+        AND
+          dtVenda <= 
+            CASE 
+              WHEN DAY(GETDATE()) = 1 THEN 
+                DATEADD(DAY, -DAY(GETDATE()), GETDATE())
+              ELSE 
+                DATEADD(DAY, -1, GETDATE())
+            END
+        AND nmFilial = ?
         '''
         cursor.execute(consulta, (filial,))
         resultado = cursor.fetchone()
-        return resultado.previsao_vendas if resultado else 0
+        return resultado.previsao_vendas if resultado and resultado.previsao_vendas is not None else 0
     except pyodbc.Error as e:
         print(f"Erro: {e}")
         return None
@@ -123,27 +167,34 @@ def acumulo_vendas_periodo_ano_anterior(filial):
     """Obtém as vendas do mesmo período do ano anterior para uma filial específica."""
     conn = obter_conexao()
     if conn is None:
-        return None
+        return 0  # Retorna 0 caso a conexão falhe
 
     try:
         cursor = conn.cursor()
         consulta = '''
         SELECT 
-            SUM(vlVenda) AS acumulo_vendas_ano_anterior
-        FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(GETDATE()) - 1  
-          AND MONTH(dtVenda) = MONTH(GETDATE())    
-          AND DAY(dtVenda) BETWEEN 1 AND DAY(GETDATE()) 
+        SUM(vlVenda) AS acumulo_vendas_ano_anterior
+        FROM dbo.tbVendasDashboard
+        WHERE YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))  
+          AND MONTH(dtVenda) = 
+              CASE 
+                 WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))  -- Se for o primeiro dia do mês, pega o mês anterior
+                 ELSE MONTH(GETDATE())  -- Caso contrário, pega o mês atual
+              END
+          AND DAY(dtVenda) BETWEEN 1 AND DAY(DATEADD(DAY, -1, GETDATE()))  
           AND nmFilial = ?
         '''
         cursor.execute(consulta, (filial,))
         resultado = cursor.fetchone()
-        return resultado.acumulo_vendas_ano_anterior if resultado else 0
+
+        # Verifica se resultado é None e retorna 0
+        return resultado[0] if resultado and resultado[0] is not None else 0
     except pyodbc.Error as e:
         print(f"Erro: {e}")
-        return None
+        return 0  # Retorna 0 em caso de erro
     finally:
         conn.close()
+
 
 def obter_acumulo_meta_ano_anterior(filial):
     """Obtém o acúmulo de meta (vendas do mês anterior + 5%) para uma filial específica, com base no mesmo período do ano anterior."""
@@ -154,12 +205,17 @@ def obter_acumulo_meta_ano_anterior(filial):
     try:
         cursor = conn.cursor()
         consulta = '''
-        SELECT SUM(vlVenda) * 1.05 AS acumulo_meta_ano_anterior
-        FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(GETDATE()) - 1  
-          AND MONTH(dtVenda) = MONTH(GETDATE())    
-          AND DAY(dtVenda) BETWEEN 1 AND DAY(GETDATE()) 
-          AND nmFilial = ?
+        SELECT 
+            SUM(vlVenda) * 1.05 AS acumulo_meta_ano_anterior
+        FROM dbo.tbVendasDashboard
+        WHERE YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))  
+          AND MONTH(dtVenda) = 
+              CASE 
+                  WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))
+                  ELSE MONTH(GETDATE())
+              END
+          AND DAY(dtVenda) BETWEEN 1 AND DAY(DATEADD(DAY, -1, GETDATE()))  
+          AND nmFilial = ? 
         '''
         cursor.execute(consulta, (filial,))
         resultado = cursor.fetchone()
@@ -171,23 +227,35 @@ def obter_acumulo_meta_ano_anterior(filial):
         conn.close()
 
 def obter_acumulo_de_vendas(filial):
-    """Obtém o acúmulo de vendas do mês atual para uma filial específica."""
+    """Obtém o acúmulo de vendas do mês atual para uma filial específica.
+    Se for o primeiro dia do mês, retorna os dados do mês anterior.
+    """
     conn = obter_conexao()
     if conn is None:
         return None
-    
+
     try:
         cursor = conn.cursor()
         consulta = '''
-        SELECT SUM(vlVenda) AS acumulo_de_vendas
-        FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(GETDATE())  -- Ano atual
-          AND MONTH(dtVenda) = MONTH(GETDATE())  -- Mês atual
-          AND nmFilial = ?  -- Filial específica
+        SELECT 
+            SUM(vlVenda) AS acumulo_de_vendas
+        FROM dbo.tbVendasDashboard
+        WHERE 
+            YEAR(dtVenda) = 
+                CASE 
+                    WHEN DAY(GETDATE()) = 1 THEN YEAR(DATEADD(MONTH, -1, GETDATE()))
+                    ELSE YEAR(GETDATE())
+                END
+          AND MONTH(dtVenda) = 
+                CASE 
+                    WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))
+                    ELSE MONTH(GETDATE())
+                END
+          AND nmFilial = ?
         '''
         cursor.execute(consulta, (filial,))
         resultado = cursor.fetchone()
-        return resultado.acumulo_de_vendas if resultado else 0
+        return resultado.acumulo_de_vendas if resultado and resultado.acumulo_de_vendas is not None else 0
     except pyodbc.Error as e:
         print(f"Erro: {e}")
         return None
@@ -220,7 +288,7 @@ def obter_ultima_venda_com_valor(filial):
         if resultado and resultado.vlVenda is not None:
             return resultado.vlVenda, resultado.dtVenda  # Retorna o valor da última venda com valor
         else:
-            return 0  # Retorna 0 se não houver vendas com valor para o mês atual ou anteriores
+            return (0, None)  # Retorna 0 se não houver vendas com valor para o mês atual ou anteriores
     except pyodbc.Error as e:
         print(f"Erro: {e}")
         return None
@@ -232,42 +300,54 @@ def obter_percentual_de_crescimento_atual(filial):
     conn = obter_conexao()
     if conn is None:
         return None
-    
+
     try:
         cursor = conn.cursor()
         consulta = '''
         WITH vendas_mes_atual AS (
             SELECT SUM(vlVenda) AS vendas_atual
             FROM tbVendasDashboard
-            WHERE YEAR(dtVenda) = YEAR(GETDATE())
-              AND MONTH(dtVenda) = MONTH(GETDATE())
-              AND DAY(dtVenda) <= DAY(GETDATE())  -- Até o dia atual
-              AND nmFilial = ?  -- Filial específica
+            WHERE 
+                YEAR(dtVenda) = 
+                    CASE 
+                        WHEN DAY(GETDATE()) = 1 THEN YEAR(DATEADD(MONTH, -1, GETDATE()))
+                        ELSE YEAR(GETDATE())
+                    END
+                AND MONTH(dtVenda) = 
+                    CASE 
+                        WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))
+                        ELSE MONTH(GETDATE())
+                    END
+                AND nmFilial = ?
         ),
         vendas_mes_ano_anterior AS (
             SELECT SUM(vlVenda) AS vendas_ano_anterior
             FROM tbVendasDashboard
-            WHERE YEAR(dtVenda) = YEAR(GETDATE()) - 1  -- Ano passado
-              AND MONTH(dtVenda) = MONTH(GETDATE())
-              AND DAY(dtVenda) <= DAY(GETDATE())  -- Mesmo intervalo de dias do ano passado
-              AND nmFilial = ?  -- Filial específica
+            WHERE 
+                YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))
+                AND MONTH(dtVenda) = 
+                    CASE 
+                        WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))
+                        ELSE MONTH(GETDATE())
+                    END
+                AND DAY(dtVenda) BETWEEN 1 AND DAY(DATEADD(DAY, -1, GETDATE()))
+                AND nmFilial = ?
         )
-        SELECT 
-            CASE 
-                WHEN vendas_ano_anterior > 0 THEN 
-                    ROUND(((vendas_atual / vendas_ano_anterior) - 1) * 100, 2)  -- Limita a 2 casas decimais
-                ELSE 0  -- Evitar divisão por zero
+        SELECT
+            CASE
+                WHEN vendas_ano_anterior > 0 THEN
+                    ROUND(((vendas_atual / vendas_ano_anterior) - 1) * 100.0, 2)
+                ELSE NULL
             END AS percentual_diferenca
-        FROM vendas_mes_atual, vendas_mes_ano_anterior;
+        FROM vendas_mes_atual, vendas_mes_ano_anterior
         '''
         cursor.execute(consulta, (filial, filial))
         resultado = cursor.fetchone()
-        
-        if resultado:
-            percentual_diferenca = resultado[0]
-            return round(percentual_diferenca, 2)  
+
+        if resultado and resultado[0] is not None:
+            return round(resultado[0], 2)
         else:
-            return 0  
+            return 0.0  # Ou None, se preferir mostrar vazio
     except pyodbc.Error as e:
         print(f"Erro: {e}")
         return None
@@ -279,45 +359,59 @@ def obter_percentual_crescimento_meta(filial):
     conn = obter_conexao()
     if conn is None:
         return None
-    
+
     try:
         cursor = conn.cursor()
         consulta = '''
         WITH VendasAnoAnterior AS (
             SELECT 
-                SUM(vlVenda) * 1.05 AS meta_ano_anterior  -- Acrescenta 5% ao total do mesmo período do ano anterior
-            FROM tbVendasDashboard
-            WHERE YEAR(dtVenda) = YEAR(GETDATE()) - 1  -- Ano passado
-              AND MONTH(dtVenda) = MONTH(GETDATE())  -- Mesmo mês
-              AND DAY(dtVenda) BETWEEN 1 AND DAY(GETDATE())  -- Mesmo período (1º dia até o dia atual)
-              AND nmFilial = ?  -- Filial específica
+                SUM(vlVenda) * 1.05 AS acumulo_meta_ano_anterior
+            FROM dbo.tbVendasDashboard
+            WHERE 
+                YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))  
+                AND MONTH(dtVenda) = 
+                    CASE 
+                        WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))
+                        ELSE MONTH(GETDATE())
+                    END
+                AND DAY(dtVenda) BETWEEN 1 AND DAY(DATEADD(DAY, -1, GETDATE()))  
+                AND nmFilial = ?
         ),
         VendasAnoAtual AS (
             SELECT 
                 SUM(vlVenda) AS total_ano_atual  
             FROM tbVendasDashboard
-            WHERE YEAR(dtVenda) = YEAR(GETDATE())  -- Ano atual
-              AND MONTH(dtVenda) = MONTH(GETDATE())  -- Mesmo mês
-              AND DAY(dtVenda) BETWEEN 1 AND DAY(GETDATE())  -- Mesmo período (1º dia até o dia atual)
-              AND nmFilial = ?  -- Filial específica
+            WHERE 
+                YEAR(dtVenda) = 
+                    CASE 
+                        WHEN DAY(GETDATE()) = 1 THEN YEAR(DATEADD(MONTH, -1, GETDATE()))
+                        ELSE YEAR(GETDATE())
+                    END
+                AND MONTH(dtVenda) = 
+                    CASE 
+                        WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE()))
+                        ELSE MONTH(GETDATE())
+                    END
+                AND DAY(dtVenda) BETWEEN 1 AND DAY(DATEADD(DAY, -1, GETDATE()))
+                AND nmFilial = ?
         )
         SELECT 
             CAST(
                 ROUND(
-                    ((VA.total_ano_atual / VAA.meta_ano_anterior) - 1) * 100, 
+                    ((total_ano_atual / acumulo_meta_ano_anterior) - 1) * 100, 
                     2
                 ) AS DECIMAL(10,2)
             ) AS percentual_diferenca
-        FROM VendasAnoAnterior VAA, VendasAnoAtual VA;
+        FROM VendasAnoAtual, VendasAnoAnterior;
         '''
         cursor.execute(consulta, (filial, filial))
         resultado = cursor.fetchone()
-        
+
         if resultado and resultado[0] is not None:
-            return resultado[0]  
+            return resultado[0]
         else:
-            return 0  
-        
+            return 0.0
+
     except pyodbc.Error as e:
         print(f"Erro: {e}")
         return None
