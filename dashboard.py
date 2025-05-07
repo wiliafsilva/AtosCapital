@@ -217,6 +217,7 @@ def grafico_de_evolucao_vendas(vendas_mensais):
     ))
 
     fig.update_layout(
+        title=f"📊 Vendas nos últimos 12 meses - {filial_selecionada}",
         xaxis_title="Meses",
         yaxis_title="Valor das Vendas (R$)",
         font=dict(color="white", size=14),
@@ -294,31 +295,36 @@ dados_vendas["vendas"] = dados_vendas["filial"].apply(
     lambda f: max(float(consultaSQL.obter_acumulo_de_vendas(f) or 0), 1)
 )
 
-
 dados_vendas["vendas_formatado"] = dados_vendas["vendas"].apply(
-    lambda v: lc.format_string('%.2f', v, grouping=True).replace('.', 'X').replace(',', '.').replace('X', ',')
+    lambda v: f"R$ {lc.format_string('%.2f', v, grouping=True)}"
 )
 
-# Cores mais intensas conforme o valor da venda
 fig_mapa = px.scatter_mapbox(
     dados_vendas,
     lat="latitude",
     lon="longitude",
-    hover_name="filial",
-    hover_data={"vendas": ":,.2f"},
     color="vendas",
     size="vendas",
-    color_continuous_scale="Turbo",
     size_max=30,
     zoom=3,
     height=600,
+    color_continuous_scale="RdBu",
+    custom_data=["filial", "vendas_formatado"]  
 )
 
+fig_mapa.update_traces(
+    hovertemplate="<b>%{customdata[0]}</b><br>Vendas: %{customdata[1]}<extra></extra>"
+)
 
 fig_mapa.update_layout(
-    mapbox_style="carto-darkmatter",  # alternativo: "open-street-map", "white-bg"
-    margin={"r":0, "t":0, "l":0, "b":0},
-    coloraxis_colorbar=dict(title="Vendas (R$)", tickprefix="R$ "),
+    mapbox_style="carto-darkmatter",
+    margin={"r": 0, "t": 0, "l": 0, "b": 0},
+    coloraxis_colorbar=dict(
+    title="Vendas (R$)",
+    tickvals=np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5),
+    ticktext=[f"R$ {lc.format_string('%.2f', v, grouping=True)}" for v in np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5)]
+    )
+
 )
 
 st.subheader("📍 Mapa das filiais com Vendas Acumuladas")
