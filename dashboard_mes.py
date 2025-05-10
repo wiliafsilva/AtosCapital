@@ -6,12 +6,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 import locale as lc
 import consultaSQL
-import dashboard_mes
 
 lc.setlocale(lc.LC_ALL, 'pt_BR')
 
 st.set_page_config(
-    page_title='Dashboard',
+    page_title='Dashboard mês',
     page_icon=':a:',
     layout='wide'
 )
@@ -35,15 +34,16 @@ filial_selecionada = st.sidebar.selectbox("Selecione a Filial", filiais)
 meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-st.sidebar.header("Outros meses")
+mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses)
 
-st.sidebar.button("Visualizar") # Ainda não redireciona para dashboard_mes
-    
+# Transforma o mês selecionado em lista
+mes_referencia = [mes_referencia]
 
-# mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses)
+# Selecionar ano
+anos = [2024, 2025]
 
-# # Transforma o mês selecionado em lista
-# mes_referencia = [mes_referencia]
+ano_referencia = st.sidebar.selectbox("Selecione o ano", anos)
+
 #fim sidebar
 
 #inicio cabeçalho
@@ -65,7 +65,7 @@ percentual_crescimento_atual = consultaSQL.obter_percentual_de_crescimento_atual
 percentual_crescimento_meta = consultaSQL.obter_percentual_crescimento_meta(filial_selecionada)
 vendas_mensais = consultaSQL.obter_vendas_anual_e_filial(filial_selecionada)
 
-@st.cache_data
+# @st.cache_data Precisou ser removido para atualizar o mês selecionado.
 def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas):
     def safe_float(value):
         if value is None:
@@ -95,7 +95,7 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
     ))
 
     fig.update_layout(
-        title=f"📊 Metas e previsões da {filial_selecionada}",
+        title=f"📊 Mês de {mes_referencia[0]}",
         xaxis_title="",
         yaxis_title="Valor (R$)",
         font=dict(color="white", size=14),
@@ -269,17 +269,17 @@ dados_vendas['longitude'] = dados_vendas['filial'].map(lambda x: coordenadas_fil
 #Exibição:
 col1, col2, col3 = st.columns(3)
 
-with col1:
-   st.write(f"""#### Vendas 2024: \n 
-            R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
-            """)
-with col2:
-   st.write(f"""#### Acumulado 2024: \n
-            R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
-            """)
-with col3:
-   st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
-            R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
+# with col1:
+#    st.write(f"""#### Vendas 2024: \n 
+#             R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
+#             """)
+# with col2:
+#    st.write(f"""#### Acumulado 2024: \n
+#             R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
+#             """)
+# with col3:
+#    st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
+#             R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
 
    
 exibindo_grafico_de_barras = grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas)
