@@ -39,61 +39,64 @@ def obter_nmfilial():
     finally:
         conn.close()
 
-def obter_vendas_ano_anterior(filial):
+def obter_vendas_ano_anterior(filial, mes, ano):
     """Executa a consulta para obter o total de vendas do mesmo período do ano anterior para a filial especificada."""
     conn = obter_conexao()
     if conn is None:
         return None
-    
+
     try:
         cursor = conn.cursor()
         consulta = '''
         SELECT SUM(vlVenda) AS total_vendas_ano_anterior
         FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))
-          AND MONTH(dtVenda) = 
-              CASE 
-                  WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE())) -- Se for o primeiro dia do mês, pega o mês anterior
-                  ELSE MONTH(GETDATE()) -- Caso contrário, pega o mês atual
-              END
+        WHERE YEAR(dtVenda) = ? 
+          AND MONTH(dtVenda) = ?
           AND nmFilial = ?
         '''
-        cursor.execute(consulta, (filial,))
-        resultado = cursor.fetchone()  # Pega o primeiro resultado
-        if resultado:
+        cursor.execute(consulta, (ano, mes, filial))
+        resultado = cursor.fetchone()
+        if resultado and resultado.total_vendas_ano_anterior is not None:
             return resultado.total_vendas_ano_anterior
         else:
-            return 0  # Caso não haja vendas
+            return 0
     except pyodbc.Error as e:
         print(f"Erro ao executar a consulta: {e}")
         return None
     finally:
         conn.close()
 
-def obter_meta_mes(filial):
-    """Obtém a meta de vendas (vendas do mês anterior + 5%) para uma filial específica."""
+def obter_meta_mes(filial, mes, ano):
+    """
+    Obtém a meta de vendas: soma de vlVenda do mês e ano anteriores ao informados,
+    com acréscimo de 5%.
+    """
     conn = obter_conexao()
     if conn is None:
         return None
-    
+
     try:
         cursor = conn.cursor()
+
         consulta = '''
         SELECT SUM(vlVenda) * 1.05 AS meta_mes
         FROM tbVendasDashboard
-        WHERE YEAR(dtVenda) = YEAR(DATEADD(YEAR, -1, GETDATE()))
-          AND MONTH(dtVenda) = 
-              CASE 
-                  WHEN DAY(GETDATE()) = 1 THEN MONTH(DATEADD(MONTH, -1, GETDATE())) -- Se for o primeiro dia do mês, pega o mês anterior
-                  ELSE MONTH(GETDATE()) -- Caso contrário, pega o mês atual
-              END
+        WHERE YEAR(dtVenda) = ?
+          AND MONTH(dtVenda) = ?
           AND nmFilial = ?
         '''
-        cursor.execute(consulta, (filial,))
+
+        ano_anterior = ano - 1
+        cursor.execute(consulta, (ano_anterior, mes, filial))
         resultado = cursor.fetchone()
-        return resultado.meta_mes if resultado else 0
+
+        if resultado and resultado.meta_mes is not None:
+            return resultado.meta_mes
+        else:
+            return 0
+
     except pyodbc.Error as e:
-        print(f"Erro: {e}")
+        print(f"Erro ao executar a consulta: {e}")
         return None
     finally:
         conn.close()
@@ -261,6 +264,8 @@ def obter_acumulo_de_vendas(filial):
         return None
     finally:
         conn.close()
+        
+
 
 def obter_ultima_venda_com_valor(filial):
     """Obtém a última venda com valor do mês atual ou, se não houver, dos meses anteriores para uma filial específica."""
@@ -350,6 +355,37 @@ def obter_percentual_de_crescimento_atual(filial):
             return 0.0  # Ou None, se preferir mostrar vazio
     except pyodbc.Error as e:
         print(f"Erro: {e}")
+        return None
+    finally:
+        conn.close()
+        
+def obter_vendas_mes_atual(filial, mes, ano):
+    """Executa a consulta para obter o total de vendas do mês e ano especificados para a filial."""
+    conn = obter_conexao()
+    if conn is None:
+        return None
+
+    try:
+        cursor = conn.cursor()
+
+        consulta = '''
+        SELECT SUM(vlVenda) AS total_vendas_mes_atual
+        FROM tbVendasDashboard
+        WHERE YEAR(dtVenda) = ?
+          AND MONTH(dtVenda) = ?
+          AND nmFilial = ?
+        '''
+
+        cursor.execute(consulta, (ano, mes, filial))
+        resultado = cursor.fetchone()
+
+        if resultado and resultado.total_vendas_mes_atual is not None:
+            return resultado.total_vendas_mes_atual
+        else:
+            return 0
+
+    except pyodbc.Error as e:
+        print(f"Erro ao executar a consulta: {e}")
         return None
     finally:
         conn.close()

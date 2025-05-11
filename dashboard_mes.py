@@ -5,12 +5,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import locale as lc
-import consultaSQL
+import consulta_SQL_mes
+from datetime import datetime, timedelta
 
 lc.setlocale(lc.LC_ALL, 'pt_BR')
 
 st.set_page_config(
-    page_title='Dashboard mês',
+    page_title='Dashboard Mês',
     page_icon=':a:',
     layout='wide'
 )
@@ -28,22 +29,52 @@ st.markdown(
 )
 
 st.sidebar.header("Filtros")
-filiais= consultaSQL.obter_nmfilial()
+filiais= consulta_SQL_mes.obter_nmfilial()
 filial_selecionada = st.sidebar.selectbox("Selecione a Filial", filiais)
 
 meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses)
+hoje = datetime.today()
+dia_hoje = hoje.day
+mes_atual = hoje.month
+ano_atual = hoje.year
+
+anos_disponiveis = list(range(2020, ano_atual + 1))  # ou outro range conforme sua base de dados
+ano_selecionado = st.sidebar.selectbox("Selecione o ano de referência", anos_disponiveis, index=len(anos_disponiveis) - 1)
+
+if ano_selecionado == ano_atual:
+    meses_disponiveis = meses[:mes_atual]  # Só permite até o mês atual
+else:
+    meses_disponiveis = meses 
+
+mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses_disponiveis)
+
+    
+# Após o st.selectbox do mes_referencia:
+
+indice_mes_referencia = meses.index(mes_referencia) + 1
+
+if dia_hoje == 1 and indice_mes_referencia == mes_atual and ano_selecionado == ano_atual:
+    # Pega dois meses atrás
+    data_ref = (hoje.replace(day=1) - timedelta(days=1)).replace(day=1)
+    data_ref = (data_ref - timedelta(days=1)).replace(day=1)
+    mes_final = data_ref.month
+    ano_final = data_ref.year 
+elif dia_hoje != 1 and indice_mes_referencia == mes_atual and ano_selecionado == ano_atual:
+    # Pega um mês atrás
+    data_ref = (hoje.replace(day=1) - timedelta(days=1)).replace(day=1)
+    mes_final = data_ref.month
+    ano_final = data_ref.year
+else:
+    # Usa mês selecionado mesmo
+    mes_final = indice_mes_referencia
+    ano_final = ano_selecionado
+
 
 # Transforma o mês selecionado em lista
 mes_referencia = [mes_referencia]
-
-# Selecionar ano
-anos = [2024, 2025]
-
-ano_referencia = st.sidebar.selectbox("Selecione o ano", anos)
-
+mes_selecionado = mes_referencia[0]
 #fim sidebar
 
 #inicio cabeçalho
@@ -54,19 +85,19 @@ st.write(f"# Relatório de venda da {filial_selecionada}")
 #fim cabeçalho
 
 
-total_vendas =  consultaSQL.obter_vendas_ano_anterior(filial_selecionada)
-meta_mes = consultaSQL.obter_meta_mes(filial_selecionada)
-previsao = consultaSQL.obter_previsao_vendas(filial_selecionada)
-acumulo_vendas_ano_anterior = consultaSQL.acumulo_vendas_periodo_ano_anterior(filial_selecionada)
-acumulo_meta_ano_anterior = consultaSQL.obter_acumulo_meta_ano_anterior(filial_selecionada)
-acumulo_de_vendas = consultaSQL.obter_acumulo_de_vendas(filial_selecionada)
-vendas_dia_anterior, data_venda_dia = consultaSQL.obter_ultima_venda_com_valor(filial_selecionada)
-percentual_crescimento_atual = consultaSQL.obter_percentual_de_crescimento_atual(filial_selecionada)
-percentual_crescimento_meta = consultaSQL.obter_percentual_crescimento_meta(filial_selecionada)
-vendas_mensais = consultaSQL.obter_vendas_anual_e_filial(filial_selecionada)
+total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior(filial_selecionada, mes_final, ano_final - 1)
+meta_mes = consulta_SQL_mes.obter_meta_mes(filial_selecionada, mes_final, ano_final)
+previsao = consulta_SQL_mes.obter_previsao_vendas(filial_selecionada)
+acumulo_vendas_ano_anterior = consulta_SQL_mes.acumulo_vendas_periodo_ano_anterior(filial_selecionada)
+acumulo_meta_ano_anterior = consulta_SQL_mes.obter_acumulo_meta_ano_anterior(filial_selecionada)
+vendas_mes_atual = consulta_SQL_mes.obter_vendas_mes_atual(filial_selecionada, mes_final, ano_selecionado)
+vendas_dia_anterior, data_venda_dia = consulta_SQL_mes.obter_ultima_venda_com_valor(filial_selecionada)
+percentual_crescimento_atual = consulta_SQL_mes.obter_percentual_de_crescimento_atual(filial_selecionada)
+percentual_crescimento_meta = consulta_SQL_mes.obter_percentual_crescimento_meta(filial_selecionada)
+vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial(filial_selecionada)
 
-# @st.cache_data Precisou ser removido para atualizar o mês selecionado.
-def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas):
+@st.cache_data
+def grafico_de_barras(meta_mes, vendas_ano, vendas_mes_atual):
     def safe_float(value):
         if value is None:
             return 0.0
@@ -76,13 +107,13 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
             return 0.0
 
     meta_mes = safe_float(meta_mes)
-    previsao = safe_float(previsao)
-    acumulo_meta_ano_anterior = safe_float(acumulo_meta_ano_anterior)
-    acumulo_de_vendas = safe_float(acumulo_de_vendas)
+    vendas_ano = safe_float(vendas_ano)
+    # acumulo_meta_ano_anterior = safe_float(acumulo_meta_ano_anterior)
+    vendas_mes_atual = safe_float(vendas_mes_atual)
 
-    categorias = ["Meta do mês", "Previsão", "Acumulado meta", "Acumulado Vendas"]
-    valores = [meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas]
-    cores = ["darkgray", "darkblue", "darkred", "white"]
+    categorias = ["Meta do mês", f"Vendas ano anterior", f"Vendas de {mes_selecionado}"]
+    valores = [meta_mes, vendas_ano, vendas_mes_atual]
+    cores = ["darkgray", "darkblue", "darkred"]
 
     fig = go.Figure()
 
@@ -95,7 +126,7 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
     ))
 
     fig.update_layout(
-        title=f"📊 Mês de {mes_referencia[0]}",
+        title=f"📊 Mês: {mes_selecionado}",
         xaxis_title="",
         yaxis_title="Valor (R$)",
         font=dict(color="white", size=14),
@@ -151,7 +182,7 @@ def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_
 
 @st.cache_data #as informações da função vai ficar em cache
 def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
-    vendas = consultaSQL.obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada)
+    vendas = consulta_SQL_mes.obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada)
 
     if not vendas:
         st.warning("Nenhuma venda encontrada para os filtros selecionados.")
@@ -269,20 +300,20 @@ dados_vendas['longitude'] = dados_vendas['filial'].map(lambda x: coordenadas_fil
 #Exibição:
 col1, col2, col3 = st.columns(3)
 
-# with col1:
-#    st.write(f"""#### Vendas 2024: \n 
-#             R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
-#             """)
-# with col2:
-#    st.write(f"""#### Acumulado 2024: \n
-#             R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
-#             """)
-# with col3:
-#    st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
-#             R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
+with col1:
+   st.write(f"""#### Vendas 2024: \n 
+            R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
+            """)
+with col2:
+   st.write(f"""#### Acumulado 2024: \n
+            R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
+            """)
+with col3:
+   st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
+            R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
 
    
-exibindo_grafico_de_barras = grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas)
+exibindo_grafico_de_barras = grafico_de_barras(meta_mes, total_vendas, vendas_mes_atual)
 st.plotly_chart(exibindo_grafico_de_barras, use_container_width=True)
 
 st.divider()
@@ -298,7 +329,7 @@ st.write(exibindo_grafico_acompanhamanto_anual)
 
 # Simula valores de vendas para cada filial (você pode substituir pelos reais)
 dados_vendas["vendas"] = dados_vendas["filial"].apply(
-    lambda f: max(float(consultaSQL.obter_acumulo_de_vendas(f) or 0), 1)
+    lambda f: max(float(consulta_SQL_mes.obter_vendas_mes_atual(f) or 0), 1)
 )
 
 dados_vendas["vendas_formatado"] = dados_vendas["vendas"].apply(
