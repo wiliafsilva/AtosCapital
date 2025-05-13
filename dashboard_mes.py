@@ -300,17 +300,17 @@ dados_vendas['longitude'] = dados_vendas['filial'].map(lambda x: coordenadas_fil
 #Exibição:
 col1, col2, col3 = st.columns(3)
 
-with col1:
-   st.write(f"""#### Vendas 2024: \n 
-            R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
-            """)
-with col2:
-   st.write(f"""#### Acumulado 2024: \n
-            R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
-            """)
-with col3:
-   st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
-            R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
+# with col1:
+#    st.write(f"""#### Vendas 2024: \n 
+#             R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
+#             """)
+# with col2:
+#    st.write(f"""#### Acumulado 2024: \n
+#             R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
+#             """)
+# with col3:
+#    st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
+#             R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
 
    
 exibindo_grafico_de_barras = grafico_de_barras(meta_mes, total_vendas, vendas_mes_atual)
