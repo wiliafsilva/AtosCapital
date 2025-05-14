@@ -454,8 +454,7 @@ def obter_percentual_crescimento_meta(filial):
     finally:
         conn.close()
 
-
-def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
+def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada, ano_selecionado):
     nomes_para_numeros = {
         "Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
         "Maio": "05", "Junho": "06", "Julho": "07", "Agosto": "08",
@@ -465,8 +464,7 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
     if not (mes_referencia and filial_selecionada):
         return []
 
-    ano_atual = datetime.now().year
-    ano_anterior = ano_atual - 1
+    ano_anterior = ano_selecionado - 1
     resultados_totais = []
 
     conn = obter_conexao()
@@ -478,11 +476,11 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
 
         for mes_nome in mes_referencia:
             mes_num = int(nomes_para_numeros[mes_nome])
-            ultimo_dia = calendar.monthrange(ano_atual, mes_num)[1]
+            ultimo_dia = calendar.monthrange(ano_selecionado, mes_num)[1]
 
-            # Busca para o ano atual
-            data_inicio_atual = f"{ano_atual}-{mes_num:02d}-01"
-            data_fim_atual = f"{ano_atual}-{mes_num:02d}-{ultimo_dia}"
+            # Ano selecionado
+            data_inicio_atual = f"{ano_selecionado}-{mes_num:02d}-01"
+            data_fim_atual = f"{ano_selecionado}-{mes_num:02d}-{ultimo_dia}"
 
             query = """
                 SELECT vlVenda, dtVenda, ? as mes_nome, ? as ano
@@ -491,10 +489,10 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada):
                 AND nmFilial = ?
                 ORDER BY dtVenda
             """
-            cursor.execute(query, (mes_nome, ano_atual, data_inicio_atual, data_fim_atual, filial_selecionada))
+            cursor.execute(query, (mes_nome, ano_selecionado, data_inicio_atual, data_fim_atual, filial_selecionada))
             resultados_totais.extend(cursor.fetchall())
 
-            # Busca para o ano anterior
+            # Ano anterior
             data_inicio_anterior = f"{ano_anterior}-{mes_num:02d}-01"
             data_fim_anterior = f"{ano_anterior}-{mes_num:02d}-{calendar.monthrange(ano_anterior, mes_num)[1]}"
 

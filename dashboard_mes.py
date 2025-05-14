@@ -43,14 +43,31 @@ ano_atual = hoje.year
 anos_disponiveis = list(range(2020, ano_atual + 1))  # ou outro range conforme sua base de dados
 ano_selecionado = st.sidebar.selectbox("Selecione o ano de referência", anos_disponiveis, index=len(anos_disponiveis) - 1)
 
+if dia_hoje == 1 and mes_atual == 1:
+    # Remove o ano atual da lista (não deixa selecionar Janeiro de X)
+    anos_disponiveis.remove(ano_atual)
+
 if ano_selecionado == ano_atual:
-    meses_disponiveis = meses[:mes_atual]  # Só permite até o mês atual
+    if dia_hoje == 1:
+        if mes_atual == 1:
+            # 1º de Janeiro do ano atual → nenhum mês disponível
+            meses_disponiveis = []
+        else:
+            # 1º de qualquer outro mês → exclui mês atual e mês anterior
+            meses_disponiveis = meses[:mes_atual - 2]  # até dois meses atrás
+    else:
+        # Dia 2 em diante → permite até o mês anterior
+        meses_disponiveis = meses[:mes_atual - 1]
 else:
-    meses_disponiveis = meses 
+    # Ano anterior → todos os meses
+    meses_disponiveis = meses
 
-mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses_disponiveis)
-
-    
+if meses_disponiveis:
+    mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses_disponiveis)
+else:
+    st.sidebar.warning("Nenhum mês disponível para seleção com base na data atual.")
+    mes_referencia = None
+      
 # Após o st.selectbox do mes_referencia:
 
 indice_mes_referencia = meses.index(mes_referencia) + 1
@@ -180,15 +197,14 @@ def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_
     )
     return fig
 
-@st.cache_data #as informações da função vai ficar em cache
-def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
-    vendas = consulta_SQL_mes.obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada)
+@st.cache_data
+def grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionado):
+    vendas = consulta_SQL_mes.obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada, ano_selecionado)
 
     if not vendas:
         st.warning("Nenhuma venda encontrada para os filtros selecionados.")
         return
 
-    # Extrai e organiza os dados
     valores = [float(v[0]) if isinstance(v[0], Decimal) else v[0] for v in vendas]
     datas = [v[1] for v in vendas]
     meses = [v[2] for v in vendas]
@@ -203,10 +219,9 @@ def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
 
     df_vendas["Dia"] = df_vendas["Data"].dt.day 
     df_vendas["Valor_formatado"] = df_vendas["Valor"].apply(lambda x: lc.currency(x, grouping=True))
+    df_vendas["MesAno"] = df_vendas["Mês"] + "/" + df_vendas["Ano"]
 
     fig = go.Figure()
-
-    df_vendas["MesAno"] = df_vendas["Mês"] + "/" + df_vendas["Ano"]
 
     for mesano in df_vendas["MesAno"].unique():
         df_mesano = df_vendas[df_vendas["MesAno"] == mesano]
@@ -225,6 +240,7 @@ def grafico_linhas_por_filial(mes_referencia, filial_selecionada):
         xaxis_title="Dia do Mês",
         yaxis_title="Vendas (R$)",
         template="plotly_white",
+        showlegend=True,
         yaxis=dict(
             tickprefix="R$ ",
             separatethousands=True, 
@@ -321,48 +337,48 @@ st.divider()
 exibindo_grafico_de_crescimento = grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta)
 st.sidebar.plotly_chart(exibindo_grafico_de_crescimento)
 
-exibindo_grafico_de_linhas_vendas_por_mes = grafico_linhas_por_filial(mes_referencia,filial_selecionada)
+exibindo_grafico_de_linhas_vendas_por_mes = grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionado)
 st.write(exibindo_grafico_de_linhas_vendas_por_mes)
 
 exibindo_grafico_acompanhamanto_anual = grafico_de_evolucao_vendas(vendas_mensais)
 st.write(exibindo_grafico_acompanhamanto_anual)
 
 # Simula valores de vendas para cada filial (você pode substituir pelos reais)
-dados_vendas["vendas"] = dados_vendas["filial"].apply(
-    lambda f: max(float(consulta_SQL_mes.obter_vendas_mes_atual(f) or 0), 1)
-)
+# dados_vendas["vendas"] = dados_vendas["filial"].apply(
+#     lambda f: max(float(consulta_SQL_mes.obter_vendas_mes_atual(f) or 0), 1)
+# )
 
-dados_vendas["vendas_formatado"] = dados_vendas["vendas"].apply(
-    lambda v: f"R$ {lc.format_string('%.2f', v, grouping=True)}"
-)
+# dados_vendas["vendas_formatado"] = dados_vendas["vendas"].apply(
+#     lambda v: f"R$ {lc.format_string('%.2f', v, grouping=True)}"
+# )
 
-fig_mapa = px.scatter_mapbox(
-    dados_vendas,
-    lat="latitude",
-    lon="longitude",
-    color="vendas",
-    size="vendas",
-    size_max=30,
-    zoom=3,
-    height=600,
-    color_continuous_scale="RdBu",
-    custom_data=["filial", "vendas_formatado"]  
-)
+# fig_mapa = px.scatter_mapbox(
+#     dados_vendas,
+#     lat="latitude",
+#     lon="longitude",
+#     color="vendas",
+#     size="vendas",
+#     size_max=30,
+#     zoom=3,
+#     height=600,
+#     color_continuous_scale="RdBu",
+#     custom_data=["filial", "vendas_formatado"]  
+# )
 
-fig_mapa.update_traces(
-    hovertemplate="<b>%{customdata[0]}</b><br>Vendas: %{customdata[1]}<extra></extra>"
-)
+# fig_mapa.update_traces(
+#     hovertemplate="<b>%{customdata[0]}</b><br>Vendas: %{customdata[1]}<extra></extra>"
+# )
 
-fig_mapa.update_layout(
-    mapbox_style="carto-darkmatter",
-    margin={"r": 0, "t": 0, "l": 0, "b": 0},
-    coloraxis_colorbar=dict(
-    title="Vendas (R$)",
-    tickvals=np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5),
-    ticktext=[f"R$ {lc.format_string('%.2f', v, grouping=True)}" for v in np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5)]
-    )
+# fig_mapa.update_layout(
+#     mapbox_style="carto-darkmatter",
+#     margin={"r": 0, "t": 0, "l": 0, "b": 0},
+#     coloraxis_colorbar=dict(
+#     title="Vendas (R$)",
+#     tickvals=np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5),
+#     ticktext=[f"R$ {lc.format_string('%.2f', v, grouping=True)}" for v in np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5)]
+#     )
 
-)
+# )
 
-st.subheader("📍 Mapa das filiais com Vendas Acumuladas")
-st.plotly_chart(fig_mapa, use_container_width=True)
+# st.subheader("📍 Mapa das filiais com Vendas Acumuladas")
+# st.plotly_chart(fig_mapa, use_container_width=True)
