@@ -6,11 +6,11 @@ filiais = consulta_SQL_mes.obter_nmfilial()
 print("Filiais encontradas:", filiais)
 
 # Obtendo o total de vendas para uma filial
-total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior('FILIAL 0001')
+total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior_mes_anterior('FILIAL 0001')
 print("Total de vendas para a filial 'FILIAL 0001' em março de 2024:", total_vendas)
 
 # Obtendo a meta de vendas
-meta_mes = consulta_SQL_mes.obter_meta_mes('FILIAL 0001') 
+meta_mes = consulta_SQL_mes.obter_meta_mes_anterior('FILIAL 0001') 
 print(f"Meta de vendas para a filial 'FILIAL 0001' em março de 2024 (com 5% de acréscimo): {meta_mes}")
 
 previsao = consulta_SQL_mes.obter_previsao_vendas('FILIAL 0001')

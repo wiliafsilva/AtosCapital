@@ -101,20 +101,15 @@ with cent_co:
 st.write(f"# Relatório de venda da {filial_selecionada}")
 #fim cabeçalho
 
-
-total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior(filial_selecionada, mes_final, ano_final - 1)
-meta_mes = consulta_SQL_mes.obter_meta_mes(filial_selecionada, mes_final, ano_final)
-previsao = consulta_SQL_mes.obter_previsao_vendas(filial_selecionada)
-acumulo_vendas_ano_anterior = consulta_SQL_mes.acumulo_vendas_periodo_ano_anterior(filial_selecionada)
-acumulo_meta_ano_anterior = consulta_SQL_mes.obter_acumulo_meta_ano_anterior(filial_selecionada)
-vendas_mes_atual = consulta_SQL_mes.obter_vendas_mes_atual(filial_selecionada, mes_final, ano_selecionado)
-vendas_dia_anterior, data_venda_dia = consulta_SQL_mes.obter_ultima_venda_com_valor(filial_selecionada)
-percentual_crescimento_atual = consulta_SQL_mes.obter_percentual_de_crescimento_atual(filial_selecionada)
-percentual_crescimento_meta = consulta_SQL_mes.obter_percentual_crescimento_meta(filial_selecionada)
-vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial(filial_selecionada)
+total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior_mes_anterior(filial_selecionada, mes_final, ano_final - 1) # Método que realizou a mudança
+meta_mes = consulta_SQL_mes.obter_meta_mes_anterior(filial_selecionada, mes_final, ano_final) # Realizou mudança no método
+vendas_mes_atual = consulta_SQL_mes.obter_vendas_mes_anterior(filial_selecionada, mes_final, ano_selecionado) # Método usado
+percentual_crescimento_atual = consulta_SQL_mes.obter_percentual_de_crescimento_atual(filial_selecionada) # Requer continuar
+percentual_crescimento_meta = consulta_SQL_mes.obter_percentual_crescimento_meta(filial_selecionada) # Requer continuar
+vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial(filial_selecionada) # Requer continuar 
 
 @st.cache_data
-def grafico_de_barras(meta_mes, vendas_ano, vendas_mes_atual):
+def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
     def safe_float(value):
         if value is None:
             return 0.0
@@ -160,7 +155,7 @@ def grafico_de_barras(meta_mes, vendas_ano, vendas_mes_atual):
     return fig
 
 @st.cache_data 
-def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta):
+def grafico_de_crescimento_mes(percentual_crescimento_atual, percentual_crescimento_meta):
     try:
         percentual_crescimento_atual = float(percentual_crescimento_atual)
     except (ValueError, TypeError):
@@ -286,55 +281,17 @@ def grafico_de_evolucao_vendas(vendas_mensais):
     )
     return fig
 
-#Mapa das filiais
-coordenadas_filiais = {
-    'FILIAL BELÉM': {'latitude': -1.455, 'longitude': -48.489},
-    'FILIAL BELO HORIZONTE': {'latitude': -19.9167, 'longitude': -43.9345},
-    'FILIAL BRASÍLIA': {'latitude': -15.7939, 'longitude': -47.8828},
-    'FILIAL CAMPINAS': {'latitude': -22.9056, 'longitude': -47.0608},
-    'FILIAL CURITIBA': {'latitude': -25.4284, 'longitude': -49.2733},
-    'FILIAL DUQUE DE CAXIAS': {'latitude': -22.7868, 'longitude': -43.3054},
-    'FILIAL FORTALEZA': {'latitude': -3.7172, 'longitude': -38.5433},
-    'FILIAL GOIÂNIA': {'latitude': -16.6869, 'longitude': -49.2648},
-    'FILIAL GUARULHOS': {'latitude': -23.4545, 'longitude': -46.5333},
-    'FILIAL MACEIÓ': {'latitude': -9.6658, 'longitude': -35.735},
-    'FILIAL MANAUS': {'latitude': -3.119, 'longitude': -60.0217},
-    'FILIAL RECIFE': {'latitude': -8.0476, 'longitude': -34.877},
-    'FILIAL RIO DE JANEIRO': {'latitude': -22.9068, 'longitude': -43.1729},
-    'FILIAL SALVADOR': {'latitude': -12.9714, 'longitude': -38.5014},
-    'FILIAL SÃO GONÇALO': {'latitude': -22.8268, 'longitude': -43.0634},
-    'FILIAL SÃO LUÍS': {'latitude': -2.5307, 'longitude': -44.3068},
-    'FILIAL SÃO PAULO': {'latitude': -23.5505, 'longitude': -46.6333},
-}
-dados_vendas = pd.DataFrame({
-    'filial': ['FILIAL BELÉM', 'FILIAL BELO HORIZONTE', 'FILIAL BRASÍLIA', 'FILIAL CAMPINAS', 'FILIAL CURITIBA', 'FILIAL DUQUE DE CAXIAS', 'FILIAL FORTALEZA', 'FILIAL GOIÂNIA', 'FILIAL GUARULHOS', 'FILIAL MACEIÓ', 'FILIAL MANAUS', 'FILIAL RECIFE', 'FILIAL RIO DE JANEIRO', 'FILIAL SALVADOR', 'FILIAL SÃO GONÇALO', 'FILIAL SÃO LUÍS', 'FILIAL SÃO PAULO']
-})
-# Adiciona latitude e longitude ao DataFrame
-dados_vendas['latitude'] = dados_vendas['filial'].map(lambda x: coordenadas_filiais[x]['latitude'])
-dados_vendas['longitude'] = dados_vendas['filial'].map(lambda x: coordenadas_filiais[x]['longitude'])
 
 #Exibição:
 col1, col2, col3 = st.columns(3)
 
-# with col1:
-#    st.write(f"""#### Vendas 2024: \n 
-#             R$ {lc.currency(total_vendas, grouping=True, symbol=False)}
-#             """)
-# with col2:
-#    st.write(f"""#### Acumulado 2024: \n
-#             R$ {lc.currency(acumulo_vendas_ano_anterior, grouping=True, symbol=False)}
-#             """)
-# with col3:
-#    st.write(f"""#### Vendas do dia: ({data_venda_dia.strftime('%d/%m/%Y') if data_venda_dia else 'Sem data'})\n
-#             R$ {lc.currency(vendas_dia_anterior, grouping=True, symbol=False)} """)
-
    
-exibindo_grafico_de_barras = grafico_de_barras(meta_mes, total_vendas, vendas_mes_atual)
+exibindo_grafico_de_barras = grafico_de_barras_mes_anterior(meta_mes, total_vendas, vendas_mes_atual)
 st.plotly_chart(exibindo_grafico_de_barras, use_container_width=True)
 
 st.divider()
 
-exibindo_grafico_de_crescimento = grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_meta)
+exibindo_grafico_de_crescimento = grafico_de_crescimento_mes(percentual_crescimento_atual, percentual_crescimento_meta)
 st.sidebar.plotly_chart(exibindo_grafico_de_crescimento)
 
 exibindo_grafico_de_linhas_vendas_por_mes = grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionado)
@@ -342,43 +299,3 @@ st.write(exibindo_grafico_de_linhas_vendas_por_mes)
 
 exibindo_grafico_acompanhamanto_anual = grafico_de_evolucao_vendas(vendas_mensais)
 st.write(exibindo_grafico_acompanhamanto_anual)
-
-# Simula valores de vendas para cada filial (você pode substituir pelos reais)
-# dados_vendas["vendas"] = dados_vendas["filial"].apply(
-#     lambda f: max(float(consulta_SQL_mes.obter_vendas_mes_atual(f) or 0), 1)
-# )
-
-# dados_vendas["vendas_formatado"] = dados_vendas["vendas"].apply(
-#     lambda v: f"R$ {lc.format_string('%.2f', v, grouping=True)}"
-# )
-
-# fig_mapa = px.scatter_mapbox(
-#     dados_vendas,
-#     lat="latitude",
-#     lon="longitude",
-#     color="vendas",
-#     size="vendas",
-#     size_max=30,
-#     zoom=3,
-#     height=600,
-#     color_continuous_scale="RdBu",
-#     custom_data=["filial", "vendas_formatado"]  
-# )
-
-# fig_mapa.update_traces(
-#     hovertemplate="<b>%{customdata[0]}</b><br>Vendas: %{customdata[1]}<extra></extra>"
-# )
-
-# fig_mapa.update_layout(
-#     mapbox_style="carto-darkmatter",
-#     margin={"r": 0, "t": 0, "l": 0, "b": 0},
-#     coloraxis_colorbar=dict(
-#     title="Vendas (R$)",
-#     tickvals=np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5),
-#     ticktext=[f"R$ {lc.format_string('%.2f', v, grouping=True)}" for v in np.linspace(dados_vendas["vendas"].min(), dados_vendas["vendas"].max(), 5)]
-#     )
-
-# )
-
-# st.subheader("📍 Mapa das filiais com Vendas Acumuladas")
-# st.plotly_chart(fig_mapa, use_container_width=True)
