@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import locale as lc
 import consultaSQL
+from datetime import datetime
 
 lc.setlocale(lc.LC_ALL, 'pt_BR')
 
@@ -31,13 +32,10 @@ st.sidebar.header("Filtros")
 filiais= consultaSQL.obter_nmfilial()
 filial_selecionada = st.sidebar.selectbox("Selecione a Filial", filiais)
 
-meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
-         "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+st.sidebar.button("Selecionar Meses Anteriores")
 
-mes_referencia = st.sidebar.selectbox("Selecione o mês de referência", meses)
+mes_referencia = [datetime.now().strftime('%B').capitalize()]
 
-# Transforma o mês selecionado em lista
-mes_referencia = [mes_referencia]
 #fim sidebar
 
 #inicio cabeçalho
