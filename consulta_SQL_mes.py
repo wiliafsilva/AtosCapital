@@ -223,6 +223,23 @@ def obter_vendas_por_mes_e_filial(mes_referencia, filial_selecionada, ano_seleci
         return []
     finally:
         conn.close()
+        
+def obter_anos_disponiveis():
+    """Retorna uma lista de anos distintos presentes no banco de dados, ordenados em ordem crescente."""
+    conn = obter_conexao()
+    if conn is None:
+        return []
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT YEAR(dtVenda) AS ano FROM tbVendasDashboard ORDER BY ano ASC;')  # Mudei para ASC
+        anos = [row.ano for row in cursor]
+        return anos
+    except pyodbc.Error as e:
+        print(f"Erro ao executar a consulta: {e}")
+        return []
+    finally:
+        conn.close()
 
 # Funções que requer ainda utilizar:
 def obter_percentual_de_crescimento_atual(filial):

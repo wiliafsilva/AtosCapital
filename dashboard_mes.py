@@ -1,5 +1,4 @@
 from decimal import Decimal
-import numpy as np
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -7,6 +6,7 @@ import plotly.express as px
 import locale as lc
 import consulta_SQL_mes
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 lc.setlocale(lc.LC_ALL, 'pt_BR')
 
@@ -40,7 +40,7 @@ dia_hoje = hoje.day
 mes_atual = hoje.month
 ano_atual = hoje.year
 
-anos_disponiveis = list(range(2020, ano_atual + 1))  # ou outro range conforme sua base de dados
+anos_disponiveis = consulta_SQL_mes.obter_anos_disponiveis()
 ano_selecionado = st.sidebar.selectbox("Selecione o ano de referência", anos_disponiveis, index=len(anos_disponiveis) - 1)
 
 if dia_hoje == 1 and mes_atual == 1:
@@ -103,10 +103,32 @@ st.write(f"# Relatório de venda da {filial_selecionada}")
 
 total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior_mes_anterior(filial_selecionada, mes_final, ano_final - 1) # Método que realizou a mudança
 meta_mes = consulta_SQL_mes.obter_meta_mes_anterior(filial_selecionada, mes_final, ano_final) # Realizou mudança no método
-vendas_mes_atual = consulta_SQL_mes.obter_vendas_mes_anterior(filial_selecionada, mes_final, ano_selecionado) # Método usado
-percentual_crescimento_atual = consulta_SQL_mes.obter_percentual_de_crescimento_atual(filial_selecionada) # Requer continuar
+vendas_mes_atual = consulta_SQL_mes.obter_vendas_mes_anterior(filial_selecionada, mes_final, ano_selecionado) # Método usado # Requer continuar
 percentual_crescimento_meta = consulta_SQL_mes.obter_percentual_crescimento_meta(filial_selecionada) # Requer continuar
 vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial(filial_selecionada) # Requer continuar 
+
+# Criado -----
+def calcular_percentual_crescimento(vendas_mes_atual, total_vendas):
+    """Calcula o percentual de crescimento com base nos valores de vendas do mês/ano atual e do mesmo mês no ano anterior."""
+
+    if total_vendas and total_vendas > 0:
+        percentual = ((vendas_mes_atual / total_vendas) - Decimal("1")) * Decimal("100")
+        return percentual.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        return Decimal("0.00")
+percentual_crescimento = calcular_percentual_crescimento(vendas_mes_atual, total_vendas)
+
+def calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes):
+    """Calcula o percentual de crescimento com base nos valores de vendas do mês/ano atual e do mesmo mês no ano anterior."""
+
+    if meta_mes and meta_mes > 0:
+        percentual = ((vendas_mes_atual / meta_mes) - Decimal("1")) * Decimal("100")
+        return percentual.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        return Decimal("0.00")
+percentual_crescimento_meta = calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes)
+
+#-----------
 
 @st.cache_data
 def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
@@ -123,8 +145,8 @@ def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
     # acumulo_meta_ano_anterior = safe_float(acumulo_meta_ano_anterior)
     vendas_mes_atual = safe_float(vendas_mes_atual)
 
-    categorias = ["Meta do mês", f"Vendas ano anterior", f"Vendas de {mes_selecionado}"]
-    valores = [meta_mes, vendas_ano, vendas_mes_atual]
+    categorias = ["Vendas ano anterior", "Meta do mês", f"Vendas de {mes_selecionado}"]
+    valores = [vendas_ano, meta_mes, vendas_mes_atual]
     cores = ["darkgray", "darkblue", "darkred"]
 
     fig = go.Figure()
@@ -154,29 +176,33 @@ def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
     )
     return fig
 
+# Alterado
 @st.cache_data 
-def grafico_de_crescimento_mes(percentual_crescimento_atual, percentual_crescimento_meta):
+def grafico_de_crescimento_mes(vendas_mes_atual, total_vendas, meta_mes):
     try:
-        percentual_crescimento_atual = float(percentual_crescimento_atual)
+        percentual_crescimento = calcular_percentual_crescimento(vendas_mes_atual, total_vendas)
+        percentual_crescimento = float(percentual_crescimento)
     except (ValueError, TypeError):
-        percentual_crescimento_atual = 0.0
+        percentual_crescimento = 0.0
 
+    # Gerado
     try:
+        percentual_crescimento_meta = calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes)
         percentual_crescimento_meta = float(percentual_crescimento_meta)
     except (ValueError, TypeError):
         percentual_crescimento_meta = 0.0
         
     fig = go.Figure()
 
-    categorias = ["Cresc. 2025", "Cresc. meta"]
-    valores = [percentual_crescimento_atual, percentual_crescimento_meta]
+    categorias = ["Cresc. Mês", "Cresc. meta"]
+    valores = [calcular_percentual_crescimento(vendas_mes_atual, total_vendas), calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes)]
     cores = ["green","aqua"]
 
     fig.add_trace(go.Bar(
         x=categorias,
         y=valores,
         marker_color=cores,
-        text=[f"{v:,.2f} %" for v in valores],
+        text=[f"{float(v):,.2f} %" for v in valores],
         textposition='outside'
     ))
 
@@ -291,7 +317,7 @@ st.plotly_chart(exibindo_grafico_de_barras, use_container_width=True)
 
 st.divider()
 
-exibindo_grafico_de_crescimento = grafico_de_crescimento_mes(percentual_crescimento_atual, percentual_crescimento_meta)
+exibindo_grafico_de_crescimento = grafico_de_crescimento_mes(vendas_mes_atual, total_vendas, meta_mes) # Alterado
 st.sidebar.plotly_chart(exibindo_grafico_de_crescimento)
 
 exibindo_grafico_de_linhas_vendas_por_mes = grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionado)
