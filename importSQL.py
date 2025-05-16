@@ -34,5 +34,5 @@ print("Percentual de crescimento atual da filial 'FILIAL 0001':", percentual_cre
 percentual_crescimento_meta = consulta_SQL_mes.obter_percentual_crescimento_meta('FILIAL 0001')
 print("Percentual de crescimento meta da filial 'FILIAL 0001':", percentual_crescimento_meta)
 
-vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial('FILIAL BELÉM')
+vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial_mes_anterior('FILIAL BELÉM')
 print(vendas_mensais)

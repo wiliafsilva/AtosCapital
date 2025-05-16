@@ -105,7 +105,8 @@ total_vendas = consulta_SQL_mes.obter_vendas_ano_anterior_mes_anterior(filial_se
 meta_mes = consulta_SQL_mes.obter_meta_mes_anterior(filial_selecionada, mes_final, ano_final) # Realizou mudança no método
 vendas_mes_atual = consulta_SQL_mes.obter_vendas_mes_anterior(filial_selecionada, mes_final, ano_selecionado) # Método usado # Requer continuar
 percentual_crescimento_meta = consulta_SQL_mes.obter_percentual_crescimento_meta(filial_selecionada) # Requer continuar
-vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial(filial_selecionada) # Requer continuar 
+vendas_mensais = consulta_SQL_mes.obter_vendas_anual_e_filial_mes_anterior(filial_selecionada, mes=mes_final, ano=ano_final)
+
 
 # Criado -----
 def calcular_percentual_crescimento(vendas_mes_atual, total_vendas):
@@ -142,12 +143,12 @@ def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
 
     meta_mes = safe_float(meta_mes)
     vendas_ano = safe_float(vendas_ano)
-    # acumulo_meta_ano_anterior = safe_float(acumulo_meta_ano_anterior)
     vendas_mes_atual = safe_float(vendas_mes_atual)
 
     categorias = ["Vendas ano anterior", "Meta do mês", f"Vendas de {mes_selecionado}"]
     valores = [vendas_ano, meta_mes, vendas_mes_atual]
     cores = ["darkgray", "darkblue", "darkred"]
+    textos_formatados = [f'R$ {lc.currency(v, grouping=True, symbol=False)}' for v in valores]
 
     fig = go.Figure()
 
@@ -155,8 +156,11 @@ def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
         x=categorias,
         y=valores,
         marker_color=cores,
-        text=[f"R$ {lc.currency(v, grouping=True, symbol=False)}" for v in valores],
-        textposition='outside'
+        text=textos_formatados,
+        textposition='outside',
+        hovertemplate=[
+            f'{cat}, {txt}<extra></extra>' for cat, txt in zip(categorias, textos_formatados)
+        ]
     ))
 
     fig.update_layout(
@@ -272,7 +276,7 @@ def grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionad
     return fig
 
 
-def grafico_de_evolucao_vendas(vendas_mensais):
+def grafico_de_evolucao_vendas_mes_anterior(vendas_mensais, filial, ano): # Foi modificado
     df_vendas = pd.DataFrame(list(vendas_mensais.items()), columns=['Mês', 'Vendas'])
     df_vendas['Mês'] = pd.to_datetime(df_vendas['Mês'], format='%m/%Y')
     df_vendas = df_vendas.sort_values("Mês")
@@ -291,7 +295,7 @@ def grafico_de_evolucao_vendas(vendas_mensais):
     ))
 
     fig.update_layout(
-        title=f"📊 Vendas nos últimos 12 meses - {filial_selecionada}",
+        title=f"📊 Vendas - Evolução até {mes_final:02d}/{ano} - {filial}",
         xaxis_title="Meses",
         yaxis_title="Valor das Vendas (R$)",
         font=dict(color="white", size=14),
@@ -302,10 +306,11 @@ def grafico_de_evolucao_vendas(vendas_mensais):
         yaxis=dict(
             tickprefix="R$ ",
             separatethousands=True,
-            tickformat=",." 
+            tickformat=",."
         )
     )
     return fig
+
 
 
 #Exibição:
@@ -323,5 +328,5 @@ st.sidebar.plotly_chart(exibindo_grafico_de_crescimento)
 exibindo_grafico_de_linhas_vendas_por_mes = grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionado)
 st.write(exibindo_grafico_de_linhas_vendas_por_mes)
 
-exibindo_grafico_acompanhamanto_anual = grafico_de_evolucao_vendas(vendas_mensais)
-st.write(exibindo_grafico_acompanhamanto_anual)
+exibindo_grafico_acompanhamanto_mensal = grafico_de_evolucao_vendas_mes_anterior(vendas_mensais, filial_selecionada, ano_selecionado) # Foi modificado
+st.write(exibindo_grafico_acompanhamanto_mensal)

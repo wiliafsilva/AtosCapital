@@ -240,6 +240,60 @@ def obter_anos_disponiveis():
         return []
     finally:
         conn.close()
+        
+def obter_vendas_anual_e_filial_mes_anterior(filial_selecionada, mes=None, ano=None):
+    """
+    Retorna um dicionário com o total de vendas dos últimos 12 meses para uma filial específica,
+    com base no mês e ano fornecidos. Se não forem informados, considera o mês atual.
+    """
+    conn = obter_conexao()
+    if conn is None:
+        return {}
+
+    try:
+        cursor = conn.cursor()
+
+        # Se mês e ano não forem informados, usa o mês atual
+        if mes is None or ano is None:
+            hoje = datetime.today().replace(day=1)
+        else:
+            hoje = datetime(year=ano, month=mes, day=1)
+
+        # Gera os últimos 12 meses a partir da data de referência
+        meses = []
+        for i in range(12):
+            mes_ref = hoje - relativedelta(months=i)
+            meses.append((mes_ref.year, mes_ref.month))
+
+        vendas_por_mes = {}
+
+        for ano_item, mes_item in meses:
+            ultimo_dia = calendar.monthrange(ano_item, mes_item)[1]
+            data_inicio = f"{ano_item}-{mes_item:02d}-01"
+            data_fim = f"{ano_item}-{mes_item:02d}-{ultimo_dia}"
+
+            consulta = '''
+                SELECT SUM(vlVenda) as total
+                FROM tbVendasDashboard
+                WHERE dtVenda BETWEEN ? AND ?
+                  AND nmFilial = ?
+            '''
+            cursor.execute(consulta, (data_inicio, data_fim, filial_selecionada))
+            resultado = cursor.fetchone()
+            chave = f"{mes_item:02d}/{ano_item}"
+            vendas_por_mes[chave] = resultado.total if resultado and resultado.total else 0
+
+        # Ordena por data crescente (do mais antigo para o mais recente)
+        vendas_ordenadas = dict(sorted(vendas_por_mes.items(), key=lambda x: datetime.strptime(x[0], "%m/%Y")))
+
+        return vendas_ordenadas
+
+    except pyodbc.Error as e:
+        print(f"Erro ao consultar o banco de dados: {e}")
+        return {}
+    finally:
+        conn.close()
+
 
 # Funções que requer ainda utilizar:
 def obter_percentual_de_crescimento_atual(filial):
@@ -365,50 +419,3 @@ def obter_percentual_crescimento_meta(filial):
     finally:
         conn.close()
         
-def obter_vendas_anual_e_filial(filial_selecionada):
-    """Retorna um dicionário com o total de vendas dos últimos 12 meses para uma filial específica."""
-    conn = obter_conexao()
-    if conn is None:
-        return []
-
-    try:
-        cursor = conn.cursor()
-        
-        meses = []
-        hoje = datetime.today().replace(day=1)
-        for i in range(13):
-            mes_ref = hoje - relativedelta(months=i)
-            ano = mes_ref.year
-            mes = mes_ref.month
-            meses.append((ano, mes))
-
-        # Cria um dicionário para armazenar os resultados
-        vendas_por_mes = {}
-
-        for ano, mes in meses:
-            # Pega o último dia do mês de forma precisa
-            ultimo_dia = calendar.monthrange(ano, mes)[1]
-            data_inicio = f"{ano}-{mes:02d}-01"
-            data_fim = f"{ano}-{mes:02d}-{ultimo_dia}"
-
-            consulta = '''
-                SELECT SUM(vlVenda) as total
-                FROM tbVendasDashboard
-                WHERE dtVenda BETWEEN ? AND ?
-                  AND nmFilial = ?
-            '''
-            cursor.execute(consulta, (data_inicio, data_fim, filial_selecionada))
-            resultado = cursor.fetchone()
-            chave = f"{mes:02d}/{ano}"
-            vendas_por_mes[chave] = resultado.total if resultado and resultado.total else 0
-
-        # Ordena por data decrescente (mais recente primeiro)
-        vendas_ordenadas = dict(sorted(vendas_por_mes.items(), key=lambda x: datetime.strptime(x[0], "%m/%Y"), reverse=True))
-        
-        return vendas_ordenadas
-    
-    except pyodbc.Error as e:
-        print(f"Erro ao consultar o banco de dados: {e}")
-        return {}
-    finally:
-        conn.close()
