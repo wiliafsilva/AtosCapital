@@ -11,7 +11,7 @@ from datetime import datetime
 lc.setlocale(lc.LC_ALL, 'pt_BR')
 
 st.set_page_config(
-    page_title='Dashboard',
+    page_title='Atos Capital',
     page_icon=':a:',
     layout='wide'
 )
@@ -77,13 +77,18 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
     cores = ["darkgray", "darkblue", "darkred", "white"]
 
     fig = go.Figure()
-
+    
+    texto_formatado = [f"R$ {lc.currency(v, grouping=True, symbol=False)}" for v in valores]
+    hover_texto = [f"{cat}<br>R$ {lc.currency(v, grouping=True, symbol=False)}" for cat, v in zip(categorias, valores)]
+    
     fig.add_trace(go.Bar(
-        x=categorias,
-        y=valores,
-        marker_color=cores,
-        text=[f"R$ {lc.currency(v, grouping=True, symbol=False)}" for v in valores],
-        textposition='outside'
+    x=categorias,
+    y=valores,
+    marker_color=cores,
+    text=texto_formatado,
+    textposition='outside',
+    hovertext=hover_texto,
+    hoverinfo='text'
     ))
 
     fig.update_layout(
@@ -119,26 +124,42 @@ def grafico_de_crescimento(percentual_crescimento_atual, percentual_crescimento_
 
     categorias = ["Cresc. 2025", "Cresc. meta"]
     valores = [percentual_crescimento_atual, percentual_crescimento_meta]
-    cores = ["green","aqua"]
+    cores = ["green", "aqua"]
+
+    texto_formatado = [lc.format_string('%.2f', v, grouping=True) + "%" for v in valores]
+    hover_texto = [f"{cat}: {lc.format_string('%.2f', v, grouping=True)}%" for cat, v in zip(categorias, valores)]
 
     fig.add_trace(go.Bar(
         x=categorias,
         y=valores,
         marker_color=cores,
-        text=[f"{v:,.2f} %" for v in valores],
-        textposition='outside'
+        text=texto_formatado,
+        textposition='outside',
+        hovertext=hover_texto,
+        hoverinfo='text' 
     ))
 
+    y_min = min(valores)
+    y_max = max(valores)
+    y_range_margin = (y_max - y_min) * 0.3  
+
     fig.update_layout(
-        title= f"% Crescimento",
+        title="% Crescimento",
         xaxis_title="",
         yaxis_title="Valor %",
         font=dict(color="white", size=14),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        height=500, 
-        width=500
+        height=450,
+        width=450,
+        margin=dict(t=100, b=50, l=50, r=50), 
+        yaxis=dict(
+            range=[y_min - y_range_margin, y_max + y_range_margin],
+            zeroline=True,
+            zerolinecolor='gray'
+        )
     )
+
     return fig
 
 @st.cache_data #as informações da função vai ficar em cache
@@ -325,5 +346,5 @@ fig_mapa.update_layout(
 
 )
 
-st.subheader("📍 Mapa das filiais com Vendas Acumuladas")
+st.subheader("📍 Mapa das filiais - Vendas Acumuladas Mês")
 st.plotly_chart(fig_mapa, use_container_width=True)
