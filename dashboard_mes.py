@@ -201,13 +201,18 @@ def grafico_de_crescimento_mes(vendas_mes_atual, total_vendas, meta_mes):
     categorias = ["Cresc. Mês", "Cresc. meta"]
     valores = [calcular_percentual_crescimento(vendas_mes_atual, total_vendas), calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes)]
     cores = ["green","aqua"]
+    
+    texto_formatado = [lc.format_string('%.2f', v, grouping=True) + "%" for v in valores]
+    hover_texto = [f'{cat}: {lc.format_string('%.2f', v, grouping=True)}%' for cat, v in zip(categorias, valores)]
 
     fig.add_trace(go.Bar(
         x=categorias,
         y=valores,
         marker_color=cores,
-        text=[f"{float(v):,.2f} %" for v in valores],
-        textposition='outside'
+        text=texto_formatado,
+        textposition='outside',
+        hovertext=hover_texto,
+        hoverinfo='text'
     ))
 
     fig.update_layout(
