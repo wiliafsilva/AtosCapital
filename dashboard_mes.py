@@ -11,7 +11,7 @@ from decimal import Decimal, ROUND_HALF_UP
 lc.setlocale(lc.LC_ALL, 'pt_BR')
 
 st.set_page_config(
-    page_title='Dashboard Mês',
+    page_title='Atos Capital',
     page_icon=':a:',
     layout='wide'
 )
@@ -180,30 +180,26 @@ def grafico_de_barras_mes_anterior(meta_mes, vendas_ano, vendas_mes_atual):
     )
     return fig
 
-# Alterado
 @st.cache_data 
 def grafico_de_crescimento_mes(vendas_mes_atual, total_vendas, meta_mes):
     try:
-        percentual_crescimento = calcular_percentual_crescimento(vendas_mes_atual, total_vendas)
-        percentual_crescimento = float(percentual_crescimento)
+        percentual_crescimento = float(calcular_percentual_crescimento(vendas_mes_atual, total_vendas))
     except (ValueError, TypeError):
         percentual_crescimento = 0.0
 
-    # Gerado
     try:
-        percentual_crescimento_meta = calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes)
-        percentual_crescimento_meta = float(percentual_crescimento_meta)
+        percentual_crescimento_meta = float(calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes))
     except (ValueError, TypeError):
         percentual_crescimento_meta = 0.0
         
     fig = go.Figure()
 
     categorias = ["Cresc. Mês", "Cresc. meta"]
-    valores = [calcular_percentual_crescimento(vendas_mes_atual, total_vendas), calcular_percentual_crescimento_meta(vendas_mes_atual, meta_mes)]
-    cores = ["green","aqua"]
+    valores = [percentual_crescimento, percentual_crescimento_meta]
+    cores = ["green", "aqua"]
     
     texto_formatado = [lc.format_string('%.2f', v, grouping=True) + "%" for v in valores]
-    hover_texto = [f'{cat}: {lc.format_string('%.2f', v, grouping=True)}%' for cat, v in zip(categorias, valores)]
+    hover_texto = [f"{cat}: {lc.format_string('%.2f', v, grouping=True)}%" for cat, v in zip(categorias, valores)]
 
     fig.add_trace(go.Bar(
         x=categorias,
@@ -214,18 +210,29 @@ def grafico_de_crescimento_mes(vendas_mes_atual, total_vendas, meta_mes):
         hovertext=hover_texto,
         hoverinfo='text'
     ))
+    
+    y_min = min(valores)
+    y_max = max(valores)
+    y_range_margin = (y_max - y_min) * 0.3
 
     fig.update_layout(
-        title= f"% Crescimento",
+        title="% Crescimento",
         xaxis_title="",
         yaxis_title="Valor %",
         font=dict(color="white", size=14),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        height=500, 
-        width=500
+        height=450, 
+        width=450,
+        margin=dict(t=100, b=50, l=50, r=50),
+        yaxis=dict(
+            range=[y_min - y_range_margin, y_max + y_range_margin],
+            zeroline=True,
+            zerolinecolor='gray'
+        )
     )
     return fig
+
 
 @st.cache_data
 def grafico_linhas_por_filial(mes_referencia, filial_selecionada, ano_selecionado):
