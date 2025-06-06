@@ -41,7 +41,8 @@ mes_referencia = [datetime.now().strftime('%B').capitalize()]
 #inicio cabeçalho
 left_co, cent_co, last_co = st.columns(3)
 with cent_co:
-    st.image('imgs\HORIZONTAL\PNG\ATOS CAPITAL BRANCO.png', width=500)
+    st.image('imgs\HORIZONTAL\PNG\ATOS CAPITAL BORDÔ.png', width=500)
+
 st.write(f"# Relatório de venda da {filial_selecionada}")
 #fim cabeçalho
 
@@ -74,7 +75,7 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
 
     categorias = ["Meta do mês", "Previsão", "Acumulado meta", "Acumulado Vendas"]
     valores = [meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_vendas]
-    cores = ["darkgray", "darkblue", "darkred", "white"]
+    cores = ["darkgray", "darkblue", "darkred", "lightgray"]
 
     fig = go.Figure()
     
@@ -95,7 +96,7 @@ def grafico_de_barras(meta_mes, previsao, acumulo_meta_ano_anterior, acumulo_de_
         title=f"📊 Metas e previsões da {filial_selecionada}",
         xaxis_title="",
         yaxis_title="Valor (R$)",
-        font=dict(color="white", size=14),
+        font=dict(color="gray", size=14),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         height=550,
