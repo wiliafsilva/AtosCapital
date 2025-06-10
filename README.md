@@ -1,13 +1,31 @@
 # AtosCapital Código
 
+### 1.3 - Passo a Passo para execução do MVP 
+### 1.3.2 - Dashboard
+### 1. Instale a IDE Visual Studio Code
+Baixe e instale a partir de: https://code.visualstudio.com/
 
+### 2. Instale o Python no dispositivo
+Disponível em: https://www.python.org/downloads/
 
+### 3. Configure o Python no VS Code
+Abra o VS Code
+Pressione Ctrl+Shift+P → escolha Python: Select Interpreter
+Selecione o interpretador do Python instalado
 
+### 4. Faça o download do git
+https://git-scm.com/
 
+### 5. Faça uma cópia do repositório do projeto
+No terminal da IDE, execute os seguintes passos
+git clone https://github.com/wiliafsilva/AtosCapital.git
+Mude para a pasta correta com o comando cd AtosCapital
 
+### 6. Instale as dependências do projeto:
+No terminal, verifique se está na pasta do arquivo “AtosCapital” e execute o comando: pip install -r requirements.txt
 
-
-
+### 7. Execute o projeto:
+No terminal, verifique se está na pasta do arquivo “AtosCapital” e  execute o projeto com o seguinte comando: streamlit run main.py
 
 # AtosCapital IA
 
