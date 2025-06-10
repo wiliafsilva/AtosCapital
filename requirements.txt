@@ -1,0 +1,13 @@
+streamlit
+pandas
+numpy
+plotly
+python-dotenv
+mysql-connector-python
+pyodbc
+matplotlib
+python-dateutil
+locales
+Babel
+fpdf
+xlsxwriter
