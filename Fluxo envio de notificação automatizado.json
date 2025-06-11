@@ -1,0 +1,303 @@
+{
+  "name": "Envio Notificação",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Agendador",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        240
+      ],
+      "id": "acc2933c-f910-490e-9c0f-4cef03dc232b"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Obtém os dados persistentes (nível do workflow)\nconst staticData = getWorkflowStaticData('global');\n\n// Contagem atual (pega diretamente o total_null do resultado)\nconst currentCount = $input.first().json.total_null ?? 0;\n\n// Busca valor anterior salvo ou inicializa como -1\nconst previousCount = staticData.ultimaContagem ?? -1;\n\nlet hasDecreased = false;\n\n// Só atualiza e notifica se for diferente\nif (currentCount < previousCount) {\n  hasDecreased = true;\n}\n\n// Atualiza valor salvo\nstaticData.ultimaContagem = currentCount;\n\n// Retorna dados\nreturn [{\n  json: {\n    currentCount,\n    previousCount,\n    hasDecreased\n  }\n}];"
+      },
+      "name": "Comparar Contagens",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -340,
+        240
+      ],
+      "id": "c9c7c1ad-a2f6-45ec-bf51-a4f5c4b2d42a"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "df29411d-2a95-4350-8630-55056a408fce",
+              "leftValue": "={{$json[\"hasDecreased\"]}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -180,
+        240
+      ],
+      "id": "be632925-950d-4de8-b736-cbeafd99976c",
+      "name": "Verificar Diminuição"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT numero FROM usuarios;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        20,
+        0
+      ],
+      "id": "8cd0e142-50ff-4688-9314-edf44b2a43dc",
+      "name": "Puxar Numeros",
+      "credentials": {
+        "mySql": {
+          "id": "S6qEZzd9OoEbJ7Bt",
+          "name": "Atos Capital"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "=atoscapital",
+        "remoteJid": "={{$node[\"Puxar Numeros\"].json[\"numero\"]}}",
+        "messageText": "=Informações do Dashboard atualizadas com dados do dia {{new Date(new Date().setDate(new Date().getDate() - 1)).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\\//g, '/')}}\n\nPara conferir acesse o link: https://atoscapital.streamlit.app/",
+        "options_message": {
+          "delay": 300
+        }
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        200,
+        0
+      ],
+      "id": "7f2a6f04-74e7-467d-a466-6b14419e2572",
+      "name": "Enviar Dashboard Atualizado",
+      "credentials": {
+        "evolutionApi": {
+          "id": "19NxyORpzpOmLGmT",
+          "name": "Evolution API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(idVendas) AS total_null FROM tbVendasDashboard WHERE vlVenda IS NULL;"
+      },
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1.1,
+      "position": [
+        -520,
+        240
+      ],
+      "id": "b85da839-e977-4f60-8a9d-a67ba0e402f5",
+      "name": "Buscar NULLS",
+      "credentials": {
+        "microsoftSql": {
+          "id": "uuLVAMULLxXInMtK",
+          "name": "Atos Capital"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Pega os dados EXCLUSIVAMENTE do nó \"Puxar Numeros\" e filtra e-mails válidos\nconst rawData = $input.all();\n\n// Verifica se os dados vêm do nó correto (opcional, para segurança)\nif (typeof $node[\"Puxar Email\"] === 'undefined') {\n  throw new Error(\"Nó 'Puxar Email' não encontrado!\");\n}\n\n// Processa apenas e-mails válidos\nreturn rawData\n  .filter(item => item.json.email && item.json.email.includes('@'))\n  .map(validItem => ({\n    json: {\n      email: validItem.json.email.trim() // Remove espaços extras\n    }\n  }));"
+      },
+      "name": "Formatar Email",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        160,
+        180
+      ],
+      "id": "b8d7a839-f6c8-440e-9e88-2d67daa9e724"
+    },
+    {
+      "parameters": {
+        "resource": "mail",
+        "fromEmail": "eduaardonotebook@gmail.com",
+        "fromName": "Atos Capital",
+        "toEmail": "={{ $json.email }}",
+        "subject": "Dashboard Atualizado",
+        "contentType": "text/html",
+        "contentValue": "=Informações do Dashboard atualizadas com dados do dia {{new Date(new Date().setDate(new Date().getDate() - 1)).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\\\\//g, '/')}}<br><br>Para conferir acesse: <a href=\"https://atoscapital.streamlit.app/\">Atos Capital</a>",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 1,
+      "position": [
+        320,
+        180
+      ],
+      "id": "f1d12e91-4cdb-421d-915f-2825f8de6e82",
+      "name": "SendGrid",
+      "credentials": {
+        "sendGridApi": {
+          "id": "IvR95UZM3Iume8sB",
+          "name": "SendGrid EMAIL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT email FROM usuarios;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        20,
+        180
+      ],
+      "id": "1903c3a1-9b5b-4d8b-b547-82210d55522a",
+      "name": "Puxar Email",
+      "credentials": {
+        "mySql": {
+          "id": "S6qEZzd9OoEbJ7Bt",
+          "name": "Atos Capital"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Agendador": {
+      "main": [
+        [
+          {
+            "node": "Buscar NULLS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comparar Contagens": {
+      "main": [
+        [
+          {
+            "node": "Verificar Diminuição",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Diminuição": {
+      "main": [
+        [
+          {
+            "node": "Puxar Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Puxar Numeros",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Puxar Numeros": {
+      "main": [
+        [
+          {
+            "node": "Enviar Dashboard Atualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar NULLS": {
+      "main": [
+        [
+          {
+            "node": "Comparar Contagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Email": {
+      "main": [
+        [
+          {
+            "node": "SendGrid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Dashboard Atualizado": {
+      "main": [
+        []
+      ]
+    },
+    "Puxar Email": {
+      "main": [
+        [
+          {
+            "node": "Formatar Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4e4efa23-65f3-4ff7-8770-95de1ef30a76",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "80b8e67e00da678b0aae2832016cd640f5551ccd757900f28d440cc130ebe8b7"
+  },
+  "id": "lNOxhcAXqozpMAow",
+  "tags": []
+}
